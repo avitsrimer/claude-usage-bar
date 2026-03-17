@@ -27,8 +27,7 @@ class AccountManager: ObservableObject {
     var activeNotificationService: NotificationService? { notificationServices[activeAccountId ?? ""] }
 
     init(
-        directoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/claude-usage-bar", isDirectory: true)
+        directoryURL: URL = AppPaths.configDirectoryURL
     ) {
         self.directoryURL = directoryURL
         migrateIfNeeded()
@@ -202,12 +201,3 @@ class AccountManager: ObservableObject {
     }()
 }
 
-// MARK: - Helpers
-
-private extension AccountEntry {
-    func displayName(fallback: String?) -> String {
-        if let alias, !alias.isEmpty { return alias }
-        if let fallback, !fallback.isEmpty { return fallback }
-        return "Account"
-    }
-}

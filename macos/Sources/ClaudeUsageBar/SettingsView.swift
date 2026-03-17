@@ -46,7 +46,7 @@ struct SettingsWindowContent: View {
                 ForEach(accountManager.accounts) { account in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(account.displayName)
+                            Text(account.displayName())
                             if account.alias != nil, let email = account.email {
                                 Text(email)
                                     .font(.caption)

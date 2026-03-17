@@ -13,9 +13,10 @@ struct AccountEntry: Codable, Identifiable, Equatable {
         self.createdAt = Date()
     }
 
-    var displayName: String {
+    func displayName(fallback: String? = nil) -> String {
         if let alias, !alias.isEmpty { return alias }
-        if let email, !email.isEmpty { return email }
+        let effective = fallback ?? email
+        if let effective, !effective.isEmpty { return effective }
         return "Account"
     }
 }

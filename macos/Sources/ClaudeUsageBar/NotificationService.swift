@@ -70,30 +70,34 @@ class NotificationService: ObservableObject {
     private let delegate = NotificationDelegate()
     private let accountId: String
 
+    private static let udKey5h = "notificationThreshold5h"
+    private static let udKey7d = "notificationThreshold7d"
+    private static let udKeyExtra = "notificationThresholdExtra"
+
     init(accountId: String) {
         self.accountId = accountId
-        threshold5h = Self.load("notificationThreshold5h-\(accountId)")
-        threshold7d = Self.load("notificationThreshold7d-\(accountId)")
-        thresholdExtra = Self.load("notificationThresholdExtra-\(accountId)")
+        threshold5h = Self.load("\(Self.udKey5h)-\(accountId)")
+        threshold7d = Self.load("\(Self.udKey7d)-\(accountId)")
+        thresholdExtra = Self.load("\(Self.udKeyExtra)-\(accountId)")
     }
 
     func setThreshold5h(_ value: Int) {
         threshold5h = clamp(value)
-        UserDefaults.standard.set(threshold5h, forKey: "notificationThreshold5h-\(accountId)")
+        UserDefaults.standard.set(threshold5h, forKey: "\(Self.udKey5h)-\(accountId)")
         previousPct5h = nil
         if threshold5h > 0 { requestPermission() }
     }
 
     func setThreshold7d(_ value: Int) {
         threshold7d = clamp(value)
-        UserDefaults.standard.set(threshold7d, forKey: "notificationThreshold7d-\(accountId)")
+        UserDefaults.standard.set(threshold7d, forKey: "\(Self.udKey7d)-\(accountId)")
         previousPct7d = nil
         if threshold7d > 0 { requestPermission() }
     }
 
     func setThresholdExtra(_ value: Int) {
         thresholdExtra = clamp(value)
-        UserDefaults.standard.set(thresholdExtra, forKey: "notificationThresholdExtra-\(accountId)")
+        UserDefaults.standard.set(thresholdExtra, forKey: "\(Self.udKeyExtra)-\(accountId)")
         previousPctExtra = nil
         if thresholdExtra > 0 { requestPermission() }
     }

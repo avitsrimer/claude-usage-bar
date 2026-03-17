@@ -25,8 +25,7 @@ struct StoredCredentialsStore {
 
     init(
         accountId: String,
-        directoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/claude-usage-bar", isDirectory: true),
+        directoryURL: URL = AppPaths.configDirectoryURL,
         fileManager: FileManager = .default
     ) {
         self.fileManager = fileManager

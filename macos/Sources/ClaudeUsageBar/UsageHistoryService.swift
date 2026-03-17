@@ -17,8 +17,7 @@ class UsageHistoryService: ObservableObject {
 
     init(
         accountId: String,
-        directoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/claude-usage-bar", isDirectory: true)
+        directoryURL: URL = AppPaths.configDirectoryURL
     ) {
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         self.historyFileURL = directoryURL.appendingPathComponent("history-\(accountId).json")

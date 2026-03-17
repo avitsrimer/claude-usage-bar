@@ -4,27 +4,27 @@ import XCTest
 final class AccountEntryTests: XCTestCase {
     func testDisplayNamePrefersAlias() {
         let entry = AccountEntry(alias: "Work", email: "work@example.com")
-        XCTAssertEqual(entry.displayName, "Work")
+        XCTAssertEqual(entry.displayName(), "Work")
     }
 
     func testDisplayNameFallsBackToEmail() {
         let entry = AccountEntry(alias: nil, email: "me@example.com")
-        XCTAssertEqual(entry.displayName, "me@example.com")
+        XCTAssertEqual(entry.displayName(), "me@example.com")
     }
 
     func testDisplayNameFallsBackToAccountWhenEmpty() {
         let entry = AccountEntry(alias: nil, email: nil)
-        XCTAssertEqual(entry.displayName, "Account")
+        XCTAssertEqual(entry.displayName(), "Account")
     }
 
     func testDisplayNameIgnoresEmptyAlias() {
         let entry = AccountEntry(alias: "", email: "me@example.com")
-        XCTAssertEqual(entry.displayName, "me@example.com")
+        XCTAssertEqual(entry.displayName(), "me@example.com")
     }
 
     func testDisplayNameEmojiAlias() {
         let entry = AccountEntry(alias: "🏢", email: "work@example.com")
-        XCTAssertEqual(entry.displayName, "🏢")
+        XCTAssertEqual(entry.displayName(), "🏢")
     }
 }
 

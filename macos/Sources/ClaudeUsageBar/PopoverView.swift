@@ -117,7 +117,7 @@ private struct AccountTab: View {
 
     var body: some View {
         Button(action: onSelect) {
-            Text(account.displayName)
+            Text(account.displayName())
                 .font(.system(size: 11))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
