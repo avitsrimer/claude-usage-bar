@@ -115,7 +115,7 @@ class AccountManager: ObservableObject {
 
         let cancellable = service.$accountEmail
             .compactMap { $0 }
-            .sink { [weak self] email in
+            .sink { @MainActor [weak self] email in
                 guard let self,
                       let index = self.accounts.firstIndex(where: { $0.id == entry.id }),
                       self.accounts[index].email != email else { return }
@@ -131,7 +131,7 @@ class AccountManager: ObservableObject {
 
     private func observeActiveAccountId() {
         accountIdCancellable = $activeAccountId
-            .sink { [weak self] _ in
+            .sink { @MainActor [weak self] _ in
                 self?.updateActiveServiceObservers()
             }
     }
@@ -145,10 +145,10 @@ class AccountManager: ObservableObject {
             return
         }
         service.$isAuthenticated
-            .sink { [weak self] value in self?.isActiveAccountAuthenticated = value }
+            .sink { @MainActor [weak self] value in self?.isActiveAccountAuthenticated = value }
             .store(in: &activeServiceCancellables)
         service.$usage
-            .sink { [weak self] _ in
+            .sink { @MainActor [weak self] _ in
                 self?.activePct5h = service.pct5h
                 self?.activePct7d = service.pct7d
             }

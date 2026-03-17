@@ -86,7 +86,7 @@ class UsageHistoryService: ObservableObject {
         guard flushTimer == nil else { return }
         flushTimer = Timer.publish(every: Self.flushInterval, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
+            .sink { @MainActor [weak self] _ in
                 self?.flushToDisk()
             }
     }
