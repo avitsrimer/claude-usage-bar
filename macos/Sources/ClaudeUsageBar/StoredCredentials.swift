@@ -24,13 +24,14 @@ struct StoredCredentialsStore {
     let legacyTokenFileURL: URL
 
     init(
+        accountId: String,
         directoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/claude-usage-bar", isDirectory: true),
         fileManager: FileManager = .default
     ) {
         self.fileManager = fileManager
         self.directoryURL = directoryURL
-        self.credentialsFileURL = directoryURL.appendingPathComponent("credentials.json")
+        self.credentialsFileURL = directoryURL.appendingPathComponent("credentials-\(accountId).json")
         self.legacyTokenFileURL = directoryURL.appendingPathComponent("token")
     }
 

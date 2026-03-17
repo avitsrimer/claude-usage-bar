@@ -76,7 +76,7 @@ class UsageService: ObservableObject {
         userinfoEndpoint: URL = UsageService.defaultUserinfoEndpoint,
         tokenEndpoint: URL = UsageService.defaultTokenEndpoint,
         redirectUri: String = UsageService.defaultRedirectURI,
-        credentialsStore: StoredCredentialsStore = StoredCredentialsStore(),
+        credentialsStore: StoredCredentialsStore,
         localProfileLoader: @MainActor @escaping () -> String? = UsageService.loadLocalProfile
     ) {
         self.session = session

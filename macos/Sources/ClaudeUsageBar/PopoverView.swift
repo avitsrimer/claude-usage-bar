@@ -1,49 +1,233 @@
 import SwiftUI
 
 struct PopoverView: View {
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var appUpdater: AppUpdater
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AccountTabBar(accountManager: accountManager)
+            Divider()
+
+            if let service = accountManager.activeService,
+               let historyService = accountManager.activeHistoryService,
+               let notificationService = accountManager.activeNotificationService {
+                AccountContentView(
+                    service: service,
+                    historyService: historyService,
+                    notificationService: notificationService,
+                    appUpdater: appUpdater,
+                    onRemove: {
+                        if let id = accountManager.activeAccountId {
+                            accountManager.removeAccount(id: id)
+                        }
+                    }
+                )
+            } else {
+                noAccountView
+            }
+        }
+        .frame(width: 340)
+    }
+
+    private var noAccountView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Claude Usage")
+                .font(.headline)
+            Text("Add an account to get started.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("Add Account") {
+                accountManager.addAccount()
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity)
+            Divider()
+            HStack {
+                settingsButton
+                Spacer()
+                Button("Quit") { NSApplication.shared.terminate(nil) }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+    }
+
+    private var settingsButton: some View {
+        SettingsLink { Text("Settings…") }
+            .buttonStyle(.borderless)
+            .font(.caption)
+    }
+}
+
+// MARK: - Tab Bar
+
+private struct AccountTabBar: View {
+    @ObservedObject var accountManager: AccountManager
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(accountManager.accounts) { account in
+                        AccountTab(
+                            account: account,
+                            isActive: accountManager.activeAccountId == account.id,
+                            onSelect: {
+                                accountManager.activeAccountId = account.id
+                                accountManager.saveAccounts()
+                            },
+                            onRename: { alias in
+                                accountManager.setAlias(alias, for: account.id)
+                            }
+                        )
+                    }
+                }
+            }
+
+            Divider()
+                .frame(height: 16)
+                .padding(.horizontal, 4)
+
+            Button {
+                accountManager.addAccount()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(width: 24, height: 28)
+            }
+            .buttonStyle(.borderless)
+            .help("Add Account")
+            .padding(.trailing, 4)
+        }
+        .frame(height: 28)
+    }
+}
+
+private struct AccountTab: View {
+    let account: AccountEntry
+    let isActive: Bool
+    let onSelect: () -> Void
+    let onRename: (String) -> Void
+
+    @State private var isHovered = false
+    @State private var isEditing = false
+
+    var body: some View {
+        Button(action: onSelect) {
+            Text(account.displayName)
+                .font(.system(size: 11))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+        }
+        .buttonStyle(.borderless)
+        .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
+        .overlay(alignment: .topTrailing) {
+            if isHovered {
+                Button {
+                    isEditing = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 7, weight: .medium))
+                        .padding(3)
+                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.9))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.borderless)
+                .offset(x: 4, y: -4)
+            }
+        }
+        .onHover { isHovered = $0 }
+        .popover(isPresented: $isEditing, arrowEdge: .bottom) {
+            AliasEditPopover(
+                currentAlias: account.alias ?? "",
+                placeholder: account.email ?? "e.g. Work, Personal, 🏢",
+                onSave: { alias in
+                    onRename(alias)
+                    isEditing = false
+                },
+                onCancel: { isEditing = false }
+            )
+        }
+    }
+}
+
+private struct AliasEditPopover: View {
+    @State private var text: String
+    let placeholder: String
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+
+    init(
+        currentAlias: String,
+        placeholder: String,
+        onSave: @escaping (String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        _text = State(initialValue: currentAlias)
+        self.placeholder = placeholder
+        self.onSave = onSave
+        self.onCancel = onCancel
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Rename Account")
+                .font(.headline)
+            TextField(placeholder, text: $text)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 200)
+                .onSubmit { onSave(text) }
+            HStack {
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(.borderless)
+                Spacer()
+                Button("Save") { onSave(text) }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+    }
+}
+
+// MARK: - Account Content
+
+private struct AccountContentView: View {
     @ObservedObject var service: UsageService
     @ObservedObject var historyService: UsageHistoryService
     @ObservedObject var notificationService: NotificationService
     @ObservedObject var appUpdater: AppUpdater
-    @AppStorage("setupComplete") private var setupComplete = false
+    let onRemove: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if !setupComplete && !service.isAuthenticated {
-                SetupView(
-                    service: service,
-                    notificationService: notificationService,
-                    onComplete: { setupComplete = true }
-                )
+            Text("Claude Usage")
+                .font(.headline)
+            if service.isAwaitingCode {
+                CodeEntryView(service: service)
+            } else if !service.isAuthenticated {
+                signInView
             } else {
-                Text("Claude Usage")
-                    .font(.headline)
-                if !service.isAuthenticated {
-                    signInView
-                } else {
-                    usageView
-                }
+                usageView
             }
         }
         .padding()
-        .frame(width: 340)
     }
 
     @ViewBuilder
     private var signInView: some View {
-        if service.isAwaitingCode {
-            CodeEntryView(service: service)
-        } else {
-            Text("Sign in to view your usage.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        Text("Sign in to view your usage.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
 
-            Button("Sign in with Claude") {
-                service.startOAuthFlow()
-            }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity)
+        Button("Sign in with Claude") {
+            service.startOAuthFlow()
         }
+        .buttonStyle(.borderedProminent)
+        .frame(maxWidth: .infinity)
 
         if let error = service.lastError {
             Label(error, systemImage: "exclamationmark.triangle")
@@ -55,10 +239,14 @@ struct PopoverView: View {
         HStack {
             settingsButton
             Spacer()
-            Button("Quit") {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.borderless)
+            Button("Remove Account", action: onRemove)
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Quit") { NSApplication.shared.terminate(nil) }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -143,97 +331,9 @@ struct PopoverView: View {
     }
 
     private var settingsButton: some View {
-        SettingsLink {
-            Text("Settings…")
-        }
-        .buttonStyle(.borderless)
-        .font(.caption)
-    }
-}
-
-// MARK: - Setup (first launch)
-
-private struct SetupView: View {
-    @ObservedObject var service: UsageService
-    @ObservedObject var notificationService: NotificationService
-    var onComplete: () -> Void
-
-    var body: some View {
-        Text("Welcome")
-            .font(.headline)
-        Text("Configure your preferences to get started.")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-
-        Divider()
-
-        LaunchAtLoginToggle(controlSize: .small, useSwitchStyle: true)
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Notifications")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            SetupThresholdSlider(
-                label: "5-hour window",
-                value: notificationService.threshold5h,
-                onChange: { notificationService.setThreshold5h($0) }
-            )
-            SetupThresholdSlider(
-                label: "7-day window",
-                value: notificationService.threshold7d,
-                onChange: { notificationService.setThreshold7d($0) }
-            )
-            SetupThresholdSlider(
-                label: "Extra usage",
-                value: notificationService.thresholdExtra,
-                onChange: { notificationService.setThresholdExtra($0) }
-            )
-        }
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Polling Interval")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Picker("", selection: Binding(
-                get: { service.pollingMinutes },
-                set: { service.updatePollingInterval($0) }
-            )) {
-                ForEach(UsageService.pollingOptions, id: \.self) { mins in
-                    Text(localizedPollingInterval(for: mins, locale: .autoupdatingCurrent))
-                        .tag(mins)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            if isDiscouragedPollingOption(service.pollingMinutes) {
-                Text("Frequent polling may cause rate limiting")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
-        }
-
-        Divider()
-
-        Button("Get Started") {
-            onComplete()
-        }
-        .buttonStyle(.borderedProminent)
-        .frame(maxWidth: .infinity)
-
-        HStack {
-            Spacer()
-            Button("Quit") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+        SettingsLink { Text("Settings…") }
+            .buttonStyle(.borderless)
+            .font(.caption)
     }
 }
 
@@ -333,34 +433,6 @@ private struct ExtraUsageRow: View {
                 ProgressView(value: (extra.utilization ?? 0) / 100.0, total: 1.0)
                     .tint(.blue)
             }
-        }
-    }
-}
-
-private struct SetupThresholdSlider: View {
-    let label: String
-    let value: Int
-    let onChange: (Int) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label)
-                    .font(.callout)
-                Spacer()
-                Text(value > 0 ? "\(value)%" : "Off")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Slider(
-                value: Binding(
-                    get: { Double(value) },
-                    set: { onChange(Int($0)) }
-                ),
-                in: 0...100,
-                step: 5
-            )
-            .controlSize(.small)
         }
     }
 }

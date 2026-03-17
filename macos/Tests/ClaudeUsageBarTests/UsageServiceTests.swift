@@ -272,11 +272,11 @@ final class UsageServiceTests: XCTestCase {
         XCTAssertEqual(saved.refreshToken, "refresh-new")
     }
 
-    private func makeStore() throws -> StoredCredentialsStore {
+    private func makeStore(accountId: String = "test-account") throws -> StoredCredentialsStore {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return StoredCredentialsStore(directoryURL: directory)
+        return StoredCredentialsStore(accountId: accountId, directoryURL: directory)
     }
 
     private func makeSession() -> URLSession {

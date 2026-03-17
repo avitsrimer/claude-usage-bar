@@ -20,6 +20,7 @@ final class StoredCredentialsTests: XCTestCase {
         let directoryPermissions = try permissions(for: store.directoryURL)
         XCTAssertEqual(filePermissions, 0o600)
         XCTAssertEqual(directoryPermissions, 0o700)
+        XCTAssertTrue(store.credentialsFileURL.lastPathComponent.contains("test-account"))
     }
 
     func testStoreLoadsLegacyRawTokenFile() throws {
@@ -40,11 +41,11 @@ final class StoredCredentialsTests: XCTestCase {
         XCTAssertEqual(loaded.scopes, UsageService.defaultOAuthScopes)
     }
 
-    private func makeStore() throws -> StoredCredentialsStore {
+    private func makeStore(accountId: String = "test-account") throws -> StoredCredentialsStore {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return StoredCredentialsStore(directoryURL: directory)
+        return StoredCredentialsStore(accountId: accountId, directoryURL: directory)
     }
 
     private func permissions(for url: URL) throws -> Int {

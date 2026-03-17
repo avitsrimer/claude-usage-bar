@@ -2,51 +2,65 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsWindowContent: View {
-    @ObservedObject var service: UsageService
-    @ObservedObject var notificationService: NotificationService
+    @ObservedObject var accountManager: AccountManager
 
     var body: some View {
         Form {
             Section("General") {
                 LaunchAtLoginToggle()
 
-                Picker("Polling Interval", selection: Binding(
-                    get: { service.pollingMinutes },
-                    set: { service.updatePollingInterval($0) }
-                )) {
-                    ForEach(UsageService.pollingOptions, id: \.self) { mins in
-                        Text(pollingOptionLabel(for: mins))
-                            .tag(mins)
+                if let service = accountManager.activeService {
+                    Picker("Polling Interval", selection: Binding(
+                        get: { service.pollingMinutes },
+                        set: { service.updatePollingInterval($0) }
+                    )) {
+                        ForEach(UsageService.pollingOptions, id: \.self) { mins in
+                            Text(pollingOptionLabel(for: mins))
+                                .tag(mins)
+                        }
                     }
                 }
             }
 
-            Section("Notifications") {
-                ThresholdSlider(
-                    label: "5-hour window",
-                    value: notificationService.threshold5h,
-                    onChange: { notificationService.setThreshold5h($0) }
-                )
-                ThresholdSlider(
-                    label: "7-day window",
-                    value: notificationService.threshold7d,
-                    onChange: { notificationService.setThreshold7d($0) }
-                )
-                ThresholdSlider(
-                    label: "Extra usage",
-                    value: notificationService.thresholdExtra,
-                    onChange: { notificationService.setThresholdExtra($0) }
-                )
+            if let notificationService = accountManager.activeNotificationService {
+                Section("Notifications") {
+                    ThresholdSlider(
+                        label: "5-hour window",
+                        value: notificationService.threshold5h,
+                        onChange: { notificationService.setThreshold5h($0) }
+                    )
+                    ThresholdSlider(
+                        label: "7-day window",
+                        value: notificationService.threshold7d,
+                        onChange: { notificationService.setThreshold7d($0) }
+                    )
+                    ThresholdSlider(
+                        label: "Extra usage",
+                        value: notificationService.thresholdExtra,
+                        onChange: { notificationService.setThresholdExtra($0) }
+                    )
+                }
             }
 
-            if service.isAuthenticated {
-                Section("Account") {
-                    if let email = service.accountEmail {
-                        Text(email)
+            Section("Accounts") {
+                ForEach(accountManager.accounts) { account in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(account.displayName)
+                            if account.alias != nil, let email = account.email {
+                                Text(email)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Button("Sign Out") {
+                            accountManager.removeAccount(id: account.id)
+                        }
                     }
-                    Button("Sign Out") {
-                        service.signOut()
-                    }
+                }
+                Button("Add Account") {
+                    accountManager.addAccount()
                 }
             }
         }

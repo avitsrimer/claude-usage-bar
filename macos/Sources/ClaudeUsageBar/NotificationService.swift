@@ -61,15 +61,20 @@ class NotificationService: ObservableObject {
     @Published private(set) var threshold7d: Int
     @Published private(set) var thresholdExtra: Int
 
+    /// Display name used in notification titles (e.g. alias or email).
+    var accountDisplayName: String = "Claude Usage"
+
     private var previousPct5h: Double?
     private var previousPct7d: Double?
     private var previousPctExtra: Double?
     private let delegate = NotificationDelegate()
+    private let accountId: String
 
-    init() {
-        threshold5h = Self.load("notificationThreshold5h")
-        threshold7d = Self.load("notificationThreshold7d")
-        thresholdExtra = Self.load("notificationThresholdExtra")
+    init(accountId: String) {
+        self.accountId = accountId
+        threshold5h = Self.load("notificationThreshold5h-\(accountId)")
+        threshold7d = Self.load("notificationThreshold7d-\(accountId)")
+        thresholdExtra = Self.load("notificationThresholdExtra-\(accountId)")
         if Bundle.main.bundleIdentifier != nil {
             UNUserNotificationCenter.current().delegate = delegate
         }
@@ -77,21 +82,21 @@ class NotificationService: ObservableObject {
 
     func setThreshold5h(_ value: Int) {
         threshold5h = clamp(value)
-        UserDefaults.standard.set(threshold5h, forKey: "notificationThreshold5h")
+        UserDefaults.standard.set(threshold5h, forKey: "notificationThreshold5h-\(accountId)")
         previousPct5h = nil
         if threshold5h > 0 { requestPermission() }
     }
 
     func setThreshold7d(_ value: Int) {
         threshold7d = clamp(value)
-        UserDefaults.standard.set(threshold7d, forKey: "notificationThreshold7d")
+        UserDefaults.standard.set(threshold7d, forKey: "notificationThreshold7d-\(accountId)")
         previousPct7d = nil
         if threshold7d > 0 { requestPermission() }
     }
 
     func setThresholdExtra(_ value: Int) {
         thresholdExtra = clamp(value)
-        UserDefaults.standard.set(thresholdExtra, forKey: "notificationThresholdExtra")
+        UserDefaults.standard.set(thresholdExtra, forKey: "notificationThresholdExtra-\(accountId)")
         previousPctExtra = nil
         if thresholdExtra > 0 { requestPermission() }
     }
@@ -140,7 +145,7 @@ class NotificationService: ObservableObject {
         }
 
         let content = UNMutableNotificationContent()
-        content.title = "Claude Usage"
+        content.title = accountDisplayName
         content.body = "\(window) usage has reached \(pct)%"
         content.sound = .default
 
