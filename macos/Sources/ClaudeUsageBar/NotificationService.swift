@@ -75,9 +75,6 @@ class NotificationService: ObservableObject {
         threshold5h = Self.load("notificationThreshold5h-\(accountId)")
         threshold7d = Self.load("notificationThreshold7d-\(accountId)")
         thresholdExtra = Self.load("notificationThresholdExtra-\(accountId)")
-        if Bundle.main.bundleIdentifier != nil {
-            UNUserNotificationCenter.current().delegate = delegate
-        }
     }
 
     func setThreshold5h(_ value: Int) {
@@ -103,6 +100,7 @@ class NotificationService: ObservableObject {
 
     func requestPermission() {
         guard Bundle.main.bundleIdentifier != nil else { return }
+        UNUserNotificationCenter.current().delegate = delegate
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
