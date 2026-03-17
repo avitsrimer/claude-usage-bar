@@ -20,6 +20,7 @@ class AccountManager: ObservableObject {
     private var accountIdCancellable: AnyCancellable?
 
     let directoryURL: URL
+    let keychainService: String
     static let accountsFileName = "accounts.json"
 
     var activeService: UsageService? { services[activeAccountId ?? ""] }
@@ -27,9 +28,11 @@ class AccountManager: ObservableObject {
     var activeNotificationService: NotificationService? { notificationServices[activeAccountId ?? ""] }
 
     init(
-        directoryURL: URL = AppPaths.configDirectoryURL
+        directoryURL: URL = AppPaths.configDirectoryURL,
+        keychainService: String = "claude-usage-bar"
     ) {
         self.directoryURL = directoryURL
+        self.keychainService = keychainService
         migrateIfNeeded()
         loadAccounts()
         for account in accounts {
@@ -51,14 +54,16 @@ class AccountManager: ObservableObject {
 
     // MARK: - Account Management
 
-    func addAccount() {
+    func addAccount(startOAuth: Bool = true) {
         let entry = AccountEntry()
         accounts.append(entry)
         let service = makeService(for: entry)
         services[entry.id] = service
         activeAccountId = entry.id
         saveAccounts()
-        service.startOAuthFlow()
+        if startOAuth {
+            service.startOAuthFlow()
+        }
     }
 
     func removeAccount(id: String) {
@@ -107,7 +112,7 @@ class AccountManager: ObservableObject {
         let notification = NotificationService(accountId: entry.id)
         notificationServices[entry.id] = notification
 
-        let store = StoredCredentialsStore(accountId: entry.id, directoryURL: directoryURL)
+        let store = StoredCredentialsStore(accountId: entry.id, directoryURL: directoryURL, keychainService: keychainService)
         let service = UsageService(credentialsStore: store)
         service.historyService = history
         service.notificationService = notification
@@ -130,14 +135,14 @@ class AccountManager: ObservableObject {
 
     private func observeActiveAccountId() {
         accountIdCancellable = $activeAccountId
-            .sink { @MainActor [weak self] _ in
-                self?.updateActiveServiceObservers()
+            .sink { @MainActor [weak self] newId in
+                self?.updateActiveServiceObservers(for: newId)
             }
     }
 
-    private func updateActiveServiceObservers() {
+    private func updateActiveServiceObservers(for accountId: String?) {
         activeServiceCancellables.removeAll()
-        guard let service = activeService else {
+        guard let service = services[accountId ?? ""] else {
             isActiveAccountAuthenticated = false
             activePct5h = 0
             activePct7d = 0

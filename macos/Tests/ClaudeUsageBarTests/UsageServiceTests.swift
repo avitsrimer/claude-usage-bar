@@ -272,6 +272,118 @@ final class UsageServiceTests: XCTestCase {
         XCTAssertEqual(saved.refreshToken, "refresh-new")
     }
 
+    func testFetchUsage429TriggersTokenRefresh() async throws {
+        let store = try makeStore()
+        try store.save(
+            StoredCredentials(
+                accessToken: "old-access",
+                refreshToken: "refresh-old",
+                expiresAt: Date().addingTimeInterval(3600),
+                scopes: UsageService.defaultOAuthScopes
+            )
+        )
+
+        let usageURL = URL(string: "https://example.com/api/oauth/usage")!
+        let tokenURL = URL(string: "https://example.com/v1/oauth/token")!
+        var refreshRequested = false
+
+        MockURLProtocol.handler = { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("GET", "/api/oauth/usage"):
+                return try Self.httpResponse(
+                    url: usageURL,
+                    statusCode: 429,
+                    headers: ["Retry-After": "60"]
+                )
+            case ("POST", "/v1/oauth/token"):
+                refreshRequested = true
+                return try Self.httpResponse(
+                    url: tokenURL,
+                    statusCode: 200,
+                    body: """
+                    {
+                      "access_token": "new-access",
+                      "refresh_token": "refresh-new",
+                      "expires_in": 3600,
+                      "scope": "user:profile user:inference"
+                    }
+                    """
+                )
+            default:
+                XCTFail("Unexpected request: \(request)")
+                return try Self.httpResponse(url: request.url!, statusCode: 500)
+            }
+        }
+
+        let service = UsageService(
+            session: makeSession(),
+            usageEndpoint: usageURL,
+            userinfoEndpoint: URL(string: "https://example.com/api/oauth/userinfo")!,
+            tokenEndpoint: tokenURL,
+            credentialsStore: store
+        )
+
+        await service.fetchUsage()
+
+        XCTAssertTrue(refreshRequested, "Should attempt token refresh on 429")
+        XCTAssertTrue(service.isAuthenticated)
+        XCTAssertEqual(service.lastError, "Rate limited — backing off to 3600s")
+
+        let saved = try XCTUnwrap(store.load(defaultScopes: UsageService.defaultOAuthScopes))
+        XCTAssertEqual(saved.accessToken, "new-access")
+        XCTAssertEqual(saved.refreshToken, "refresh-new")
+    }
+
+    func testFetchUsage429WithNoRefreshTokenJustBacksOff() async throws {
+        let store = try makeStore()
+        try store.save(
+            StoredCredentials(
+                accessToken: "old-access",
+                refreshToken: nil,
+                expiresAt: Date().addingTimeInterval(3600),
+                scopes: UsageService.defaultOAuthScopes
+            )
+        )
+
+        let usageURL = URL(string: "https://example.com/api/oauth/usage")!
+        let tokenURL = URL(string: "https://example.com/v1/oauth/token")!
+        var refreshRequested = false
+
+        MockURLProtocol.handler = { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("GET", "/api/oauth/usage"):
+                return try Self.httpResponse(
+                    url: usageURL,
+                    statusCode: 429,
+                    headers: ["Retry-After": "60"]
+                )
+            case ("POST", "/v1/oauth/token"):
+                refreshRequested = true
+                return try Self.httpResponse(url: tokenURL, statusCode: 200, body: "{}")
+            default:
+                XCTFail("Unexpected request: \(request)")
+                return try Self.httpResponse(url: request.url!, statusCode: 500)
+            }
+        }
+
+        let service = UsageService(
+            session: makeSession(),
+            usageEndpoint: usageURL,
+            userinfoEndpoint: URL(string: "https://example.com/api/oauth/userinfo")!,
+            tokenEndpoint: tokenURL,
+            credentialsStore: store
+        )
+
+        await service.fetchUsage()
+
+        XCTAssertFalse(refreshRequested, "Should not attempt refresh when no refresh token")
+        XCTAssertTrue(service.isAuthenticated)
+        XCTAssertEqual(service.lastError, "Rate limited — backing off to 3600s")
+
+        let saved = try XCTUnwrap(store.load(defaultScopes: UsageService.defaultOAuthScopes))
+        XCTAssertEqual(saved.accessToken, "old-access")
+    }
+
     private func makeStore(accountId: String = "test-account") throws -> StoredCredentialsStore {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

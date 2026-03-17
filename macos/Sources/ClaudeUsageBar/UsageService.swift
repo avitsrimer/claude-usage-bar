@@ -259,6 +259,7 @@ class UsageService: ObservableObject {
             }
             let (data, http) = result
             if http.statusCode == 429 {
+                _ = await refreshCredentials(force: true)   // fresh token = fresh rate limit window
                 let retryAfter = http.value(forHTTPHeaderField: "Retry-After")
                     .flatMap(Double.init) ?? currentInterval
                 currentInterval = Self.backoffInterval(
@@ -360,7 +361,8 @@ class UsageService: ObservableObject {
             return nil
         }
 
-        if initialCredentials.needsRefresh() {
+        let proactiveLeeway = currentInterval + 300  // refresh if token expires before next poll + 5min buffer
+        if initialCredentials.needsRefresh(leeway: proactiveLeeway) {
             _ = await refreshCredentials(force: true)
         }
 

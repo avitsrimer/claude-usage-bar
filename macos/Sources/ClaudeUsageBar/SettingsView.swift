@@ -10,15 +10,7 @@ struct SettingsWindowContent: View {
                 LaunchAtLoginToggle()
 
                 if let service = accountManager.activeService {
-                    Picker("Polling Interval", selection: Binding(
-                        get: { service.pollingMinutes },
-                        set: { service.updatePollingInterval($0) }
-                    )) {
-                        ForEach(UsageService.pollingOptions, id: \.self) { mins in
-                            Text(pollingOptionLabel(for: mins))
-                                .tag(mins)
-                        }
-                    }
+                    PollingIntervalPicker(service: service)
                 }
             }
 
@@ -185,6 +177,22 @@ func launchAtLoginInstallDirectories(fileManager: FileManager = .default) -> [UR
         URL(fileURLWithPath: "/Applications", isDirectory: true),
         fileManager.homeDirectoryForCurrentUser.appending(path: "Applications", directoryHint: .isDirectory)
     ]
+}
+
+private struct PollingIntervalPicker: View {
+    @ObservedObject var service: UsageService
+
+    var body: some View {
+        Picker("Polling Interval", selection: Binding(
+            get: { service.pollingMinutes },
+            set: { service.updatePollingInterval($0) }
+        )) {
+            ForEach(UsageService.pollingOptions, id: \.self) { mins in
+                Text(pollingOptionLabel(for: mins))
+                    .tag(mins)
+            }
+        }
+    }
 }
 
 private struct ThresholdSlider: View {
