@@ -28,6 +28,7 @@ struct PopoverView: View {
             }
         }
         .frame(width: 340)
+        .background(WindowPositionPreserver(trigger: accountManager.activeAccountId))
     }
 
     private var noAccountView: some View {
@@ -401,6 +402,8 @@ private struct UsageBucketRow: View {
                 Text("Resets \(resetDate, style: .relative)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            } else {
+                Text(" ").font(.caption2)
             }
         }
     }
@@ -442,5 +445,35 @@ private func colorForPct(_ pct: Double) -> Color {
     case ..<0.60: return .green
     case 0.60..<0.80: return .yellow
     default: return .red
+    }
+}
+
+// MARK: - Window Position Preserver
+
+/// Preserves the NSWindow origin when content changes size (e.g. account switching),
+/// preventing MenuBarExtra from repositioning the window off-screen on full-screen spaces.
+private struct WindowPositionPreserver: NSViewRepresentable {
+    let trigger: String?
+
+    class Coordinator {
+        var savedOrigin: NSPoint?
+        var lastTrigger: String? = "initial"
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let window = nsView.window else { return }
+        guard context.coordinator.lastTrigger != trigger else { return }
+
+        context.coordinator.savedOrigin = window.frame.origin
+        context.coordinator.lastTrigger = trigger
+
+        DispatchQueue.main.async {
+            if let origin = context.coordinator.savedOrigin {
+                window.setFrameOrigin(origin)
+            }
+        }
     }
 }
