@@ -12,6 +12,8 @@ struct SettingsWindowContent: View {
                 if let service = accountManager.activeService {
                     PollingIntervalPicker(service: service)
                 }
+
+                MultiAccountToggle(accountManager: accountManager)
             }
 
             if let notificationService = accountManager.activeNotificationService {
@@ -36,23 +38,12 @@ struct SettingsWindowContent: View {
 
             Section("Accounts") {
                 ForEach(accountManager.accounts) { account in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(account.displayName())
-                            if account.alias != nil, let email = account.email {
-                                Text(email)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                        Button("Sign Out") {
-                            accountManager.removeAccount(id: account.id)
-                        }
-                    }
+                    AccountRow(account: account, accountManager: accountManager)
                 }
-                Button("Add Account") {
-                    accountManager.addAccount()
+                if accountManager.multiAccountEnabled {
+                    Button("Add Account") {
+                        accountManager.addAccount()
+                    }
                 }
             }
         }
@@ -190,6 +181,105 @@ private struct PollingIntervalPicker: View {
             ForEach(UsageService.pollingOptions, id: \.self) { mins in
                 Text(pollingOptionLabel(for: mins))
                     .tag(mins)
+            }
+        }
+    }
+}
+
+private struct AccountRow: View {
+    let account: AccountEntry
+    @ObservedObject var accountManager: AccountManager
+    @State private var alias: String
+
+    init(account: AccountEntry, accountManager: AccountManager) {
+        self.account = account
+        self.accountManager = accountManager
+        _alias = State(initialValue: account.alias ?? "")
+    }
+
+    var body: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                PlainTextField(
+                    text: $alias,
+                    placeholder: account.email ?? "Nickname",
+                    onSubmit: save
+                )
+                .onChange(of: alias) { _, _ in save() }
+                if !alias.isEmpty, let email = account.email {
+                    Text(email)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Button("Sign Out") {
+                accountManager.removeAccount(id: account.id)
+            }
+        }
+    }
+
+    private func save() {
+        accountManager.setAlias(alias, for: account.id)
+    }
+}
+
+private struct PlainTextField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    var onSubmit: () -> Void = {}
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField()
+        field.placeholderString = placeholder
+        field.isBordered = false
+        field.drawsBackground = false
+        field.alignment = .left
+        field.focusRingType = .none
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        if nsView.stringValue != text { nsView.stringValue = text }
+        nsView.placeholderString = placeholder
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: PlainTextField
+        init(_ parent: PlainTextField) { self.parent = parent }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            if selector == #selector(NSResponder.insertNewline(_:)) {
+                parent.onSubmit()
+                return true
+            }
+            return false
+        }
+    }
+}
+
+private struct MultiAccountToggle: View {
+    @ObservedObject var accountManager: AccountManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Multi-Account Support", isOn: Binding(
+                get: { accountManager.multiAccountEnabled },
+                set: { accountManager.multiAccountEnabled = $0 }
+            ))
+            .disabled(accountManager.multiAccountEnabled && accountManager.accounts.count > 1)
+
+            if accountManager.multiAccountEnabled && accountManager.accounts.count > 1 {
+                Text("Sign out of other accounts to disable.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }

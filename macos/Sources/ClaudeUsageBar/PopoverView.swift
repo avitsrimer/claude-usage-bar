@@ -6,8 +6,10 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AccountTabBar(accountManager: accountManager)
-            Divider()
+            if accountManager.multiAccountEnabled && accountManager.accounts.count > 1 {
+                AccountTabBar(accountManager: accountManager)
+                Divider()
+            }
 
             if let service = accountManager.activeService,
                let historyService = accountManager.activeHistoryService,
@@ -69,128 +71,35 @@ private struct AccountTabBar: View {
     @ObservedObject var accountManager: AccountManager
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
+                Picker("", selection: Binding(
+                    get: { accountManager.activeAccountId },
+                    set: {
+                        accountManager.activeAccountId = $0
+                        accountManager.saveAccounts()
+                    }
+                )) {
                     ForEach(accountManager.accounts) { account in
-                        AccountTab(
-                            account: account,
-                            isActive: accountManager.activeAccountId == account.id,
-                            onSelect: {
-                                accountManager.activeAccountId = account.id
-                                accountManager.saveAccounts()
-                            },
-                            onRename: { alias in
-                                accountManager.setAlias(alias, for: account.id)
-                            }
-                        )
+                        Text(account.displayName()).tag(Optional(account.id))
                     }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
             }
-
-            Divider()
-                .frame(height: 16)
-                .padding(.horizontal, 4)
 
             Button {
                 accountManager.addAccount()
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .medium))
-                    .frame(width: 24, height: 28)
             }
             .buttonStyle(.borderless)
             .help("Add Account")
-            .padding(.trailing, 4)
         }
-        .frame(height: 28)
-    }
-}
-
-private struct AccountTab: View {
-    let account: AccountEntry
-    let isActive: Bool
-    let onSelect: () -> Void
-    let onRename: (String) -> Void
-
-    @State private var isHovered = false
-    @State private var isEditing = false
-
-    var body: some View {
-        Button(action: onSelect) {
-            Text(account.displayName())
-                .font(.system(size: 11))
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-        }
-        .buttonStyle(.borderless)
-        .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
-        .overlay(alignment: .topTrailing) {
-            if isHovered {
-                Button {
-                    isEditing = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 7, weight: .medium))
-                        .padding(3)
-                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.9))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.borderless)
-                .offset(x: 4, y: -4)
-            }
-        }
-        .onHover { isHovered = $0 }
-        .popover(isPresented: $isEditing, arrowEdge: .bottom) {
-            AliasEditPopover(
-                currentAlias: account.alias ?? "",
-                placeholder: account.email ?? "e.g. Work, Personal, 🏢",
-                onSave: { alias in
-                    onRename(alias)
-                    isEditing = false
-                },
-                onCancel: { isEditing = false }
-            )
-        }
-    }
-}
-
-private struct AliasEditPopover: View {
-    @State private var text: String
-    let placeholder: String
-    let onSave: (String) -> Void
-    let onCancel: () -> Void
-
-    init(
-        currentAlias: String,
-        placeholder: String,
-        onSave: @escaping (String) -> Void,
-        onCancel: @escaping () -> Void
-    ) {
-        _text = State(initialValue: currentAlias)
-        self.placeholder = placeholder
-        self.onSave = onSave
-        self.onCancel = onCancel
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Rename Account")
-                .font(.headline)
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 200)
-                .onSubmit { onSave(text) }
-            HStack {
-                Button("Cancel", action: onCancel)
-                    .buttonStyle(.borderless)
-                Spacer()
-                Button("Save") { onSave(text) }
-                    .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding()
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 }
 

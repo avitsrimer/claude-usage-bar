@@ -258,7 +258,6 @@ final class UsageServiceTests: XCTestCase {
             userinfoEndpoint: userinfoURL,
             tokenEndpoint: tokenURL,
             credentialsStore: store,
-            localProfileLoader: { nil }
         )
 
         await service.fetchProfile()

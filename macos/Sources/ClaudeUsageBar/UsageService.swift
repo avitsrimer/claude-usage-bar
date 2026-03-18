@@ -21,7 +21,6 @@ class UsageService: ObservableObject {
     private let userinfoEndpoint: URL
     private let tokenEndpoint: URL
     private let credentialsStore: StoredCredentialsStore
-    private let localProfileLoader: @MainActor () -> String?
     private var currentInterval: TimeInterval
     private var refreshTask: Task<Bool, Never>?
 
@@ -77,7 +76,7 @@ class UsageService: ObservableObject {
         tokenEndpoint: URL = UsageService.defaultTokenEndpoint,
         redirectUri: String = UsageService.defaultRedirectURI,
         credentialsStore: StoredCredentialsStore,
-        localProfileLoader: @MainActor @escaping () -> String? = UsageService.loadLocalProfile
+        initialEmail: String? = nil
     ) {
         self.session = session
         self.usageEndpoint = usageEndpoint
@@ -85,12 +84,12 @@ class UsageService: ObservableObject {
         self.tokenEndpoint = tokenEndpoint
         self.redirectUri = redirectUri
         self.credentialsStore = credentialsStore
-        self.localProfileLoader = localProfileLoader
         let stored = UserDefaults.standard.integer(forKey: "pollingMinutes")
         let minutes = Self.pollingOptions.contains(stored) ? stored : Self.defaultPollingMinutes
         self.pollingMinutes = minutes
         self.currentInterval = TimeInterval(minutes * 60)
         isAuthenticated = loadCredentials() != nil
+        accountEmail = initialEmail
     }
 
     // MARK: - Polling
@@ -293,11 +292,6 @@ class UsageService: ObservableObject {
     // MARK: - Profile
 
     func fetchProfile() async {
-        if let local = localProfileLoader() {
-            accountEmail = local
-            return
-        }
-
         guard let result = try? await sendAuthorizedRequest(
             to: userinfoEndpoint,
             expireSessionOnAuthFailure: false
@@ -315,24 +309,6 @@ class UsageService: ObservableObject {
         } else if let name = json["name"] as? String, !name.isEmpty {
             accountEmail = name
         }
-    }
-
-    /// Try reading the email from Claude Code's local config as a fallback.
-    nonisolated private static func loadLocalProfile() -> String? {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude.json")
-        guard let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let account = json["oauthAccount"] as? [String: Any] else {
-            return nil
-        }
-        if let email = account["emailAddress"] as? String, !email.isEmpty {
-            return email
-        }
-        if let name = account["displayName"] as? String, !name.isEmpty {
-            return name
-        }
-        return nil
     }
 
     // MARK: - Credential storage

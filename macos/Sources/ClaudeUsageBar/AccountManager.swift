@@ -5,6 +5,9 @@ import Combine
 class AccountManager: ObservableObject {
     @Published private(set) var accounts: [AccountEntry] = []
     @Published var activeAccountId: String?
+    @Published var multiAccountEnabled: Bool {
+        didSet { UserDefaults.standard.set(multiAccountEnabled, forKey: "multiAccountEnabled") }
+    }
 
     // Derived published state for the menu bar icon (reactive to active service changes)
     @Published private(set) var isActiveAccountAuthenticated = false
@@ -33,6 +36,7 @@ class AccountManager: ObservableObject {
     ) {
         self.directoryURL = directoryURL
         self.keychainService = keychainService
+        self.multiAccountEnabled = UserDefaults.standard.bool(forKey: "multiAccountEnabled")
         migrateIfNeeded()
         loadAccounts()
         for account in accounts {
@@ -113,7 +117,7 @@ class AccountManager: ObservableObject {
         notificationServices[entry.id] = notification
 
         let store = StoredCredentialsStore(accountId: entry.id, directoryURL: directoryURL, keychainService: keychainService)
-        let service = UsageService(credentialsStore: store)
+        let service = UsageService(credentialsStore: store, initialEmail: entry.email)
         service.historyService = history
         service.notificationService = notification
 
@@ -152,9 +156,9 @@ class AccountManager: ObservableObject {
             .sink { @MainActor [weak self] value in self?.isActiveAccountAuthenticated = value }
             .store(in: &activeServiceCancellables)
         service.$usage
-            .sink { @MainActor [weak self] _ in
-                self?.activePct5h = service.pct5h
-                self?.activePct7d = service.pct7d
+            .sink { @MainActor [weak self] newUsage in
+                self?.activePct5h = (newUsage?.fiveHour?.utilization ?? 0) / 100.0
+                self?.activePct7d = (newUsage?.sevenDay?.utilization ?? 0) / 100.0
             }
             .store(in: &activeServiceCancellables)
     }
