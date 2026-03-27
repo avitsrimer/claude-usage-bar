@@ -18,10 +18,23 @@ Now it's just a glimpse away — always sitting at the top of your screen.
 
 ## Fork improvements
 
-This is a fork of [Blimp-Labs/claude-usage-bar](https://github.com/Blimp-Labs/claude-usage-bar) with the following fixes:
+This is a fork of [Blimp-Labs/claude-usage-bar](https://github.com/Blimp-Labs/claude-usage-bar) with the following additions and fixes:
 
-- **Near-zero CPU when idle** — the original used `Text(date, style: .relative)` for reset timers and "last updated", which hooks into a display-link and continuously re-renders the view even with the popover closed (~4% constant CPU). Replaced with static strings updated by a 60s timer that only runs while the popover is open.
+**Features**
+- **Multi-account support** — add multiple Claude accounts, switch between them via tabs, set optional display aliases. The menu bar icon always reflects the active account. Can be toggled off in Settings when only one account is needed.
+
+**Performance**
+- **Near-zero CPU when idle** — the original used `Text(date, style: .relative)` for reset timers and "last updated", which hooks into a display-link and continuously re-renders the view even with the popover closed (~4% constant CPU). Replaced with `RelativeDateTimeFormatter` strings updated by a 60s timer that only runs while the popover is open.
 - **Reduced memory footprint** — switched from `URLSession.shared` (which allocates a persistent HTTP cache on disk and in memory) to an ephemeral session. Authenticated API responses are never cacheable anyway. Memory dropped from 350MB to 38MB.
+
+**Bug fixes**
+- Token refresh now also triggers on HTTP 429, so the next poll uses a fresh rate-limit window
+- Proactive token refresh leeway increased to `pollingInterval + 5 min` to avoid mid-poll expiry
+- Menu bar icon now shows the correct account immediately after switching (was reading `activeAccountId` in `willSet` before the property updated)
+- Polling interval picker no longer snaps back after changing (extracted as `@ObservedObject` subview so SwiftUI tracks changes correctly)
+- Keychain entries saved with `kSecAttrAccessibleAfterFirstUnlock` — no password prompt on `make install` / ad-hoc re-signing
+- Window position preserved on account switch — prevents the popover drifting off-screen in full-screen spaces with auto-hiding menu bar
+- `UNUserNotificationCenter` setup deferred to `requestPermission()` — fixes crash in the command-line test runner
 
 ## What it does
 

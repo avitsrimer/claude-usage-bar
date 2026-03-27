@@ -1,5 +1,11 @@
 import SwiftUI
 
+private let relativeDateFormatter: RelativeDateTimeFormatter = {
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .full
+    return f
+}()
+
 struct PopoverView: View {
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var appUpdater: AppUpdater
@@ -262,11 +268,9 @@ private struct AccountContentView: View {
     }
 
     private func agoText(for date: Date, now: Date) -> String {
-        let interval = now.timeIntervalSince(date)
-        if interval < 60 { return "just now" }
-        if interval < 3600 { return "\(Int(interval / 60))m ago" }
-        return "\(Int(interval / 3600))h ago"
+        relativeDateFormatter.localizedString(for: date, relativeTo: now)
     }
+
 }
 
 // MARK: - Subviews
@@ -346,17 +350,8 @@ private struct UsageBucketRow: View {
     }
 
     private func resetText(for date: Date, now: Date) -> String {
-        let interval = date.timeIntervalSince(now)
-        if interval <= 0 { return "Resetting…" }
-        if interval < 3600 { return "Resets in \(Int(interval / 60))m" }
-        if interval < 86400 {
-            let hours = Int(interval / 3600)
-            let minutes = Int(interval.truncatingRemainder(dividingBy: 3600) / 60)
-            return minutes > 0 ? "Resets in \(hours)h \(minutes)m" : "Resets in \(hours)h"
-        }
-        let days = Int(interval / 86400)
-        let hours = Int(interval.truncatingRemainder(dividingBy: 86400) / 3600)
-        return hours > 0 ? "Resets in \(days)d \(hours)h" : "Resets in \(days)d"
+        guard date > now else { return "Resetting…" }
+        return "Resets " + relativeDateFormatter.localizedString(for: date, relativeTo: now)
     }
 }
 
