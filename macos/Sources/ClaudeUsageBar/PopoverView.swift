@@ -112,6 +112,9 @@ private struct AccountContentView: View {
     @ObservedObject var appUpdater: AppUpdater
     let onRemove: () -> Void
 
+    @State private var now = Date()
+    @State private var minuteTimer: Timer?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Claude Usage")
@@ -125,6 +128,16 @@ private struct AccountContentView: View {
             }
         }
         .padding()
+        .onAppear {
+            now = Date()
+            minuteTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                now = Date()
+            }
+        }
+        .onDisappear {
+            minuteTimer?.invalidate()
+            minuteTimer = nil
+        }
     }
 
     @ViewBuilder
@@ -164,12 +177,14 @@ private struct AccountContentView: View {
     private var usageView: some View {
         UsageBucketRow(
             label: "5-Hour Window",
-            bucket: service.usage?.fiveHour
+            bucket: service.usage?.fiveHour,
+            now: now
         )
 
         UsageBucketRow(
             label: "7-Day Window",
-            bucket: service.usage?.sevenDay
+            bucket: service.usage?.sevenDay,
+            now: now
         )
 
         if let opus = service.usage?.sevenDayOpus,
@@ -178,9 +193,9 @@ private struct AccountContentView: View {
             Text("Per-Model (7 day)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            UsageBucketRow(label: "Opus", bucket: opus)
+            UsageBucketRow(label: "Opus", bucket: opus, now: now)
             if let sonnet = service.usage?.sevenDaySonnet {
-                UsageBucketRow(label: "Sonnet", bucket: sonnet)
+                UsageBucketRow(label: "Sonnet", bucket: sonnet, now: now)
             }
         }
 
@@ -210,7 +225,7 @@ private struct AccountContentView: View {
 
         HStack(spacing: 12) {
             if let updated = service.lastUpdated {
-                Text("Updated \(updated, style: .relative) ago")
+                Text("Updated \(agoText(for: updated, now: now))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -244,6 +259,13 @@ private struct AccountContentView: View {
         SettingsLink { Text("Settings…") }
             .buttonStyle(.borderless)
             .font(.caption)
+    }
+
+    private func agoText(for date: Date, now: Date) -> String {
+        let interval = now.timeIntervalSince(date)
+        if interval < 60 { return "just now" }
+        if interval < 3600 { return "\(Int(interval / 60))m ago" }
+        return "\(Int(interval / 3600))h ago"
     }
 }
 
@@ -294,6 +316,7 @@ private struct CodeEntryView: View {
 private struct UsageBucketRow: View {
     let label: String
     let bucket: UsageBucket?
+    let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -308,7 +331,7 @@ private struct UsageBucketRow: View {
             ProgressView(value: (bucket?.utilization ?? 0) / 100.0, total: 1.0)
                 .tint(colorForPct((bucket?.utilization ?? 0) / 100.0))
             if let resetDate = bucket?.resetsAtDate {
-                Text("Resets \(resetDate, style: .relative)")
+                Text(resetText(for: resetDate, now: now))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
@@ -320,6 +343,20 @@ private struct UsageBucketRow: View {
     private var percentageText: String {
         guard let pct = bucket?.utilization else { return "—" }
         return "\(Int(round(pct)))%"
+    }
+
+    private func resetText(for date: Date, now: Date) -> String {
+        let interval = date.timeIntervalSince(now)
+        if interval <= 0 { return "Resetting…" }
+        if interval < 3600 { return "Resets in \(Int(interval / 60))m" }
+        if interval < 86400 {
+            let hours = Int(interval / 3600)
+            let minutes = Int(interval.truncatingRemainder(dividingBy: 3600) / 60)
+            return minutes > 0 ? "Resets in \(hours)h \(minutes)m" : "Resets in \(hours)h"
+        }
+        let days = Int(interval / 86400)
+        let hours = Int(interval.truncatingRemainder(dividingBy: 86400) / 3600)
+        return hours > 0 ? "Resets in \(days)d \(hours)h" : "Resets in \(days)d"
     }
 }
 

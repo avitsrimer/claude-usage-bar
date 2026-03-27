@@ -16,6 +16,13 @@ Now it's just a glimpse away — always sitting at the top of your screen.
 ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/license-BSD--2--Clause-green)
 
+## Fork improvements
+
+This is a fork of [Blimp-Labs/claude-usage-bar](https://github.com/Blimp-Labs/claude-usage-bar) with the following fixes:
+
+- **Near-zero CPU when idle** — the original used `Text(date, style: .relative)` for reset timers and "last updated", which hooks into a display-link and continuously re-renders the view even with the popover closed (~4% constant CPU). Replaced with static strings updated by a 60s timer that only runs while the popover is open.
+- **Reduced memory footprint** — switched from `URLSession.shared` (which allocates a persistent HTTP cache on disk and in memory) to an ephemeral session. Authenticated API responses are never cacheable anyway. Memory dropped from 350MB to 38MB.
+
 ## What it does
 
 A tiny macOS menu bar app that shows your Claude API usage at a glance. Click it for the full picture:

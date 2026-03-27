@@ -70,7 +70,7 @@ class UsageService: ObservableObject {
     var reset7d: Date? { usage?.sevenDay?.resetsAtDate }
 
     init(
-        session: URLSession = .shared,
+        session: URLSession = URLSession(configuration: .ephemeral),
         usageEndpoint: URL = UsageService.defaultUsageEndpoint,
         userinfoEndpoint: URL = UsageService.defaultUserinfoEndpoint,
         tokenEndpoint: URL = UsageService.defaultTokenEndpoint,
