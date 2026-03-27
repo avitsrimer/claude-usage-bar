@@ -89,6 +89,10 @@ Click the icon anytime to see:
 
 To track more than one Claude account, open **Settings → Accounts** and click **Add Account**. Each account gets its own tab in the popover. You can set a display alias for each account to tell them apart at a glance. The menu bar icon always reflects the active (frontmost) account.
 
+## Security
+
+The app requests two OAuth scopes: `user:profile` (required to read usage and account email) and `user:inference` (part of the standard Claude session grant). Despite the name, `user:inference` does **not** enable making Claude API calls — Anthropic actively rejects OAuth tokens on `POST /v1/messages` with `"OAuth authentication is currently not supported"`. Only API keys work for inference; the token this app holds is read-only in practice.
+
 ## Data storage
 
 All data is stored locally in `~/.config/claude-usage-bar/`:
