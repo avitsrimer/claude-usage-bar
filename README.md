@@ -32,7 +32,6 @@ This is a fork of [Blimp-Labs/claude-usage-bar](https://github.com/Blimp-Labs/cl
 - Proactive token refresh leeway increased to `pollingInterval + 5 min` to avoid mid-poll expiry
 - Menu bar icon now shows the correct account immediately after switching (was reading `activeAccountId` in `willSet` before the property updated)
 - Polling interval picker no longer snaps back after changing (extracted as `@ObservedObject` subview so SwiftUI tracks changes correctly)
-- Keychain entries saved with `kSecAttrAccessibleAfterFirstUnlock` — no password prompt on `make install` / ad-hoc re-signing
 - Window position preserved on account switch — prevents the popover drifting off-screen in full-screen spaces with auto-hiding menu bar
 - `UNUserNotificationCenter` setup deferred to `requestPermission()` — fixes crash in the command-line test runner
 
