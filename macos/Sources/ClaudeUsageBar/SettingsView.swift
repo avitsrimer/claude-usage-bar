@@ -4,6 +4,10 @@ import ServiceManagement
 struct SettingsWindowContent: View {
     @ObservedObject var accountManager: AccountManager
 
+    // Off by default: the status poller only starts once this is on, so a user who never
+    // opts in never causes a single request to status.claude.com.
+    @AppStorage("showServiceStatus") private var showServiceStatus = false
+
     var body: some View {
         Form {
             Section("General") {
@@ -34,6 +38,13 @@ struct SettingsWindowContent: View {
                         onChange: { notificationService.setThresholdExtra($0) }
                     )
                 }
+            }
+
+            Section("Service Status") {
+                Toggle("Show Claude service status", isOn: $showServiceStatus)
+                Text("Polls status.claude.com every 5 minutes while the popover is open. Off by default.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Accounts") {

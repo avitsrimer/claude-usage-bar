@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Report Swift toolchain version
+        run: swift --version
+
       - name: Build release binary
         run: cd macos && swift build -c release
 
