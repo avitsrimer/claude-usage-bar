@@ -308,6 +308,13 @@ Branch: `fix/oauth-submit-hardening` — upstream `#50` + the non-Keychain half 
 
 ### Task 3: Flush history on every data point and write it 0600
 
+⚠️ Merged without a green CI check: GitHub had an active Minor Service Outage (githubstatus.com)
+at merge time and both CI attempts on PR #4 failed at "Getting action download info" with
+Service Unavailable/Bad Gateway — before the build started, i.e. infra, not this code. Verified
+locally instead: `swift test` 68/68 passed on the branch, diff manually scanned for trailing
+commas (none found). **Needs retroactive CI confirmation on `main` once GitHub recovers** — see
+Task 11.
+
 Branch: `fix/history-flush-durability-and-perms` — upstream `#57` + `#43`'s permissions change
 
 **Files:**
