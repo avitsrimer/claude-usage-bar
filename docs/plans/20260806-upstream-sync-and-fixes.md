@@ -314,22 +314,22 @@ Branch: `fix/history-flush-durability-and-perms` — upstream `#57` + `#43`'s pe
 - Modify: `macos/Sources/ClaudeUsageBar/UsageHistoryService.swift`
 - Create: `macos/Tests/ClaudeUsageBarTests/UsageHistoryServiceTests.swift`
 
-- [ ] remove `flushTimer`, `isDirty`, `flushInterval`, `startFlushTimerIfNeeded()`
-- [ ] **keep `import Combine`** — `ObservableObject`/`@Published` need it on the CI toolchain
-- [ ] make `recordDataPoint()` call `flushToDisk()` directly; drop the `guard isDirty` early return
-- [ ] write via temp file + `createFile(attributes: [.posixPermissions: 0o600])` +
+- [x] remove `flushTimer`, `isDirty`, `flushInterval`, `startFlushTimerIfNeeded()`
+- [x] **keep `import Combine`** — `ObservableObject`/`@Published` need it on the CI toolchain
+- [x] make `recordDataPoint()` call `flushToDisk()` directly; drop the `guard isDirty` early return
+- [x] write via temp file + `createFile(attributes: [.posixPermissions: 0o600])` +
       `replaceItemAt(_:withItemAt:options: [.usingNewMetadataOnly])`, cleaning up the temp file
       on failure. **`.usingNewMetadataOnly` is mandatory** — see Technical Details
-- [ ] preserve per-account `history-{accountId}.json` paths and `.bak.json` corrupt-file recovery
-- [ ] assess write amplification and record the conclusion in the PR description
-- [ ] write tests: `recordDataPoint` persists immediately (no timer wait)
-- [ ] write tests: **fresh** file is created `0600`
-- [ ] write tests: **pre-existing `0644`** file ends up `0600` after flush (this is the test that
+- [x] preserve per-account `history-{accountId}.json` paths and `.bak.json` corrupt-file recovery
+- [x] assess write amplification and record the conclusion in the PR description
+- [x] write tests: `recordDataPoint` persists immediately (no timer wait)
+- [x] write tests: **fresh** file is created `0600`
+- [x] write tests: **pre-existing `0644`** file ends up `0600` after flush (this is the test that
       actually catches the `replaceItemAt` metadata trap)
-- [ ] write tests: 30-day retention pruning still applies on write
-- [ ] write tests: corrupt file moves to `.bak.json` and history resets (protects our advantage)
-- [ ] run `cd macos && swift test` — must pass before Task 4
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] write tests: 30-day retention pruning still applies on write
+- [x] write tests: corrupt file moves to `.bak.json` and history resets (protects our advantage)
+- [x] run `cd macos && swift test` — must pass before Task 4
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 4: Add fetch re-entrancy guard and refresh spinner
 
