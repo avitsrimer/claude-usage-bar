@@ -627,15 +627,49 @@ Branch: `feat/right-click-quit` — ports upstream `#21` (pre-restructure paths,
 - [x] push branch, open PR, confirm CI green, merge
 
 ### Task 11: Verify acceptance criteria
-- [ ] verify all 10 implementation tasks are complete
-- [ ] verify every rejected item was left alone — in particular `StoredCredentials.swift` must be
-      untouched by this plan
-- [ ] verify no trailing commas in argument lists were introduced anywhere (the CI constraint)
-- [ ] verify `import Combine` still present in `UsageHistoryService.swift`
-- [ ] verify history file is `0600` on a pre-existing install, not just a fresh one
-- [ ] run full test suite: `cd macos && swift test`
-- [ ] confirm all 10 PRs merged and CI green on `main`
-- [ ] verify `make app` builds and launches
+
+⚠️ **CI-green-on-`main` could not be confirmed: GitHub Actions remains in an active outage.**
+Checked directly via `curl -s https://www.githubstatus.com/api/v2/components.json`: the
+`Actions` component reports `"status": "major_outage"` (`updated_at: 2026-08-06T16:33:31Z`),
+the same outage documented on Tasks 3-10, still unresolved at verification time. `gh run list
+--branch main --limit 5` shows every run on `main`, including the merges for PRs #9, #10, #11
+and their follow-up docs commits, permanently stuck in `queued` state (up to 28+ minutes old) —
+none has actually executed, let alone passed. Per the plan's outage policy this checkbox is left
+unchecked rather than fabricated as a pass; it must be revisited (re-run `gh run list`, or trigger
+a fresh run once Actions reports `operational`) once the outage clears.
+
+- [x] verify all 10 implementation tasks are complete — read every Task 1-10 section; all
+      checkboxes are `[x]`
+- [x] verify every rejected item was left alone — in particular `StoredCredentials.swift` must be
+      untouched by this plan. Confirmed via `git log --follow -- macos/Sources/ClaudeUsageBar/StoredCredentials.swift`:
+      the file's most recent commit is `c325f9a` ("fix: refresh token on 429, fix account
+      switching icon, fix polling picker, fix keychain prompt on update"), which predates PR #2
+      (`3ce2ed2`, Task 1's chart-hover fix) — no commit from Tasks 1-10 touches this file
+- [x] verify no trailing commas in argument lists were introduced anywhere (the CI constraint) —
+      scripted check: (1) diffed each of the 10 merge commits (PRs #2-#11) against their first
+      parent restricted to `*.swift`, scanning added lines for a trailing-comma line immediately
+      followed by an added closing-paren-only line — zero matches in any PR; (2) as a second pass,
+      scanned every tracked `.swift` file in `macos/` at current `main` for the same
+      comma-then-closing-paren adjacency — zero matches repo-wide
+- [x] verify `import Combine` still present in `UsageHistoryService.swift` — confirmed,
+      line 2: `import Combine`
+- [x] verify history file is `0600` on a pre-existing install, not just a fresh one — confirmed
+      `testPreExisting0644FileEndsUpAt0600AfterFlush` exists in
+      `UsageHistoryServiceTests.swift` (creates a file at `0o644`, flushes, asserts `0o600`
+      after) and ran it explicitly (`swift test --filter UsageHistoryServiceTests`): 5/5 tests
+      passed, including this one and `testFreshFileIsCreatedWithMode0600`
+- [x] run full test suite: `cd macos && swift test` — **142/142 tests passed, 0 failures**
+- [ ] confirm all 10 PRs merged and CI green on `main` — **not confirmed, see outage note above.**
+      All 10 PRs are merged into `main` (verified via `gh pr list --state merged`: PRs #2-#11,
+      one per task, plus PR #1 predating this plan). CI green cannot be confirmed while Actions
+      is in `major_outage`
+- [x] verify `make app` builds and launches — `make app` succeeded (release binary built, bundle
+      assembled, xattrs stripped, ad-hoc codesign incl. nested Sparkle framework/XPC services,
+      `codesign -v` verified OK). Launched the built `.app` directly (`open ./ClaudeUsageBar.app`);
+      process stayed alive 15+ seconds, terminated cleanly on `kill`, and no crash report was
+      written to `~/Library/Logs/DiagnosticReports/`. Could not verify UI-level behaviour
+      (popover open/close, chart hover, OAuth flow, right-click quit) headlessly — that remains
+      covered by the plan's existing Post-Completion manual-check list
 
 ### Task 12: [Final] Update documentation
 - [ ] update `README.md` if the new features (projection, service status, right-click quit) are
