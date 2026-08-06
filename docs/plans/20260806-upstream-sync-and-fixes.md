@@ -376,6 +376,14 @@ Branch: `feat/fetch-reentrancy-guard-and-spinner` — ports upstream `#51`.
 
 ### Task 5: Restore two-unit precision in the reset countdown
 
+⚠️ Merged without a green CI check: GitHub was reporting an active outage (githubstatus.com
+`indicator: "major"` — Partial System Outage, worse than the `"minor"` seen on Tasks 3/4) at
+merge time, and PR #6's `build` check was stuck `pending`, consistent with the same
+"Getting action download info" infra failure documented on PRs #4 and #5 — before any code
+builds, i.e. infra, not this code. Verified locally instead: `swift test` 83/83 passed on the
+branch, diff manually scanned for trailing commas (none found). **Needs retroactive CI
+confirmation on `main` once GitHub recovers** — see Task 11.
+
 Branch: `fix/reset-label-granularity` — **our own regression**, introduced by `a9ed221`
 
 **Files:**
