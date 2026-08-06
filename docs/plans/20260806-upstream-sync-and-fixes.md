@@ -598,6 +598,13 @@ Branch: `fix/build-hardening` — upstream `#20` + `#43`'s `build.sh` half
 
 ### Task 10: Add right-click-to-quit on the menu bar icon
 
+⚠️ Merged without a green CI check: GitHub was reporting an active outage (githubstatus.com
+`indicator: "major"` — Partial System Outage), the same outage documented on Tasks 3-9, still
+unresolved at merge time. `gh pr checks` reported no checks at all on PR #11, consistent with the
+same pre-build infra failure ("Getting action download info") seen on those PRs. Verified locally
+instead: `swift test` 142/142 passed on the branch, diff manually scanned for trailing commas
+(none found). **Needs retroactive CI confirmation on `main` once GitHub recovers** — see Task 11.
+
 Branch: `feat/right-click-quit` — ports upstream `#21` (pre-restructure paths, needs porting)
 
 **Files:**
