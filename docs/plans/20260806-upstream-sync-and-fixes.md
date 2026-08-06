@@ -348,23 +348,23 @@ Branch: `feat/fetch-reentrancy-guard-and-spinner` — ports upstream `#51`.
 - Modify: `macos/Sources/ClaudeUsageBar/PopoverView.swift`
 - Modify: `macos/Tests/ClaudeUsageBarTests/UsageServiceTests.swift`
 
-- [ ] add `@Published private(set) var isFetching = false` to `UsageService`
-- [ ] guard `fetchUsage()` on `!isFetching`, set/clear with `defer`, placed so existing early
+- [x] add `@Published private(set) var isFetching = false` to `UsageService`
+- [x] guard `fetchUsage()` on `!isFetching`, set/clear with `defer`, placed so existing early
       returns and the 429 backoff path are unaffected
-- [ ] **decide and document** what the guard means for existing fire-and-forget callers whose
+- [x] **decide and document** what the guard means for existing fire-and-forget callers whose
       calls it now silently drops: `updatePollingInterval` (~`UsageService.swift:45`) and
       `startPolling` (~`:99`). Silently skipping a scheduled poll because a manual refresh is
       in flight is probably fine — say so explicitly rather than leaving it implicit
-- [ ] adapt the footer `HStack` containing `Button("Refresh")` (~`PopoverView.swift:244`) to show
+- [x] adapt the footer `HStack` containing `Button("Refresh")` (~`PopoverView.swift:244`) to show
       a `ProgressView` while fetching, with a fixed footprint so the footer doesn't shift;
       **match our normalised row heights**, don't copy upstream's markup
-- [ ] add a 2-second cooldown (upstream `#51`'s value — don't invent a different one); note it
+- [x] add a 2-second cooldown (upstream `#51`'s value — don't invent a different one); note it
       is `@State` and therefore not unit-testable
-- [ ] write tests: concurrent `fetchUsage()` calls result in a single request
-- [ ] write tests: `isFetching` true during flight, false after, including the error path
-- [ ] write tests: the 429 backoff behaviour still works alongside the guard
-- [ ] run `cd macos && swift test` — must pass before Task 5
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] write tests: concurrent `fetchUsage()` calls result in a single request
+- [x] write tests: `isFetching` true during flight, false after, including the error path
+- [x] write tests: the 429 backoff behaviour still works alongside the guard
+- [x] run `cd macos && swift test` — must pass before Task 5
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 5: Restore two-unit precision in the reset countdown
 

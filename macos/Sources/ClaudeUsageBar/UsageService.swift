@@ -11,6 +11,7 @@ class UsageService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var isAwaitingCode = false
     @Published private(set) var accountEmail: String?
+    @Published private(set) var isFetching = false
 
     var historyService: UsageHistoryService?
     var notificationService: NotificationService?
@@ -43,6 +44,10 @@ class UsageService: ObservableObject {
         currentInterval = TimeInterval(minutes * 60)
         if isAuthenticated {
             scheduleTimer()
+            // Fire-and-forget: if a fetch is already in flight (e.g. a manual refresh),
+            // isFetching's guard silently drops this one. That's fine — the in-flight
+            // fetch will still refresh `usage`/`lastUpdated`, and scheduleTimer() above
+            // has already re-armed the timer for the new interval regardless.
             Task { await fetchUsage() }
         }
     }
@@ -99,6 +104,9 @@ class UsageService: ObservableObject {
 
     func startPolling() {
         guard isAuthenticated else { return }
+        // Fire-and-forget: same reasoning as updatePollingInterval() above. If another
+        // fetchUsage() is already running when this is called, isFetching drops the
+        // duplicate kickoff silently rather than queuing or erroring.
         Task {
             await fetchUsage()
             if accountEmail == nil { await fetchProfile() }
@@ -261,6 +269,18 @@ class UsageService: ObservableObject {
     // MARK: - API Fetch
 
     func fetchUsage() async {
+        // Re-entrancy guard (upstream #51): a manual refresh, the poll timer, and a
+        // post-auth kickoff can all race to call fetchUsage() concurrently. Collapse
+        // them to a single in-flight request rather than firing a burst. This is
+        // independent of the 429 backoff below, which slows the *timer* down in
+        // response to the server — isFetching just prevents overlap regardless of
+        // server behaviour. `defer` clears the flag on every exit path (early
+        // returns, the 429 branch, and both success/failure at the end) so those
+        // paths are otherwise unaffected.
+        guard !isFetching else { return }
+        isFetching = true
+        defer { isFetching = false }
+
         guard loadCredentials() != nil else {
             lastError = "Not signed in"
             isAuthenticated = false

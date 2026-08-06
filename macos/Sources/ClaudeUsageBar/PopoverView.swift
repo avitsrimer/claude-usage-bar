@@ -120,6 +120,11 @@ private struct AccountContentView: View {
 
     @State private var now = Date()
     @State private var minuteTimer: Timer?
+    // Upstream #51's refresh-button cooldown. Kept in addition to UsageService.isFetching:
+    // isFetching prevents overlapping network requests, this prevents the user from
+    // hammering the button the instant a (possibly very fast, e.g. cached-error) fetch
+    // completes. @State, so it's not unit-testable — see the plan.
+    @State private var refreshCoolingDown = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -241,11 +246,7 @@ private struct AccountContentView: View {
         HStack(spacing: 12) {
             settingsButton
             Spacer()
-            Button("Refresh") {
-                Task { await service.fetchUsage() }
-            }
-            .buttonStyle(.borderless)
-            .font(.caption)
+            refreshControl
             if appUpdater.isConfigured {
                 Button("Check for Updates…") {
                     appUpdater.checkForUpdates()
@@ -265,6 +266,37 @@ private struct AccountContentView: View {
         SettingsLink { Text("Settings…") }
             .buttonStyle(.borderless)
             .font(.caption)
+    }
+
+    // Fixed footprint (width + height) so swapping between the "Refresh" button and the
+    // spinner never shifts the rest of the footer row. Same normalisation approach as
+    // UsageBucketRow's blank placeholder for a missing reset date.
+    private static let refreshControlSize = CGSize(width: 44, height: 14)
+    private static let refreshCooldown: TimeInterval = 2 // upstream #51's value
+
+    @ViewBuilder
+    private var refreshControl: some View {
+        if service.isFetching {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: Self.refreshControlSize.width, height: Self.refreshControlSize.height)
+        } else {
+            Button("Refresh") { performRefresh() }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .disabled(refreshCoolingDown)
+                .frame(width: Self.refreshControlSize.width, height: Self.refreshControlSize.height)
+        }
+    }
+
+    private func performRefresh() {
+        guard !refreshCoolingDown else { return }
+        refreshCoolingDown = true
+        Task { await service.fetchUsage() }
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(Self.refreshCooldown * 1_000_000_000))
+            refreshCoolingDown = false
+        }
     }
 
     private func agoText(for date: Date, now: Date) -> String {
