@@ -565,23 +565,23 @@ Branch: `fix/build-hardening` — upstream `#20` + `#43`'s `build.sh` half
 **Files:**
 - Modify: `macos/scripts/build.sh`
 
-- [ ] add an `xattr -cr` (or equivalent) step on the app bundle immediately before the `codesign`
+- [x] add an `xattr -cr` (or equivalent) step on the app bundle immediately before the `codesign`
       calls (~`build.sh:119-127`), ensuring it precedes **all** signing including nested Sparkle
       bundles (`#20`)
-- [ ] pin the create-dmg download by SHA256 (`#43`): `build.sh:190-191` currently does
+- [x] pin the create-dmg download by SHA256 (`#43`): `build.sh:190-191` currently does
       `curl -fsSL "$CREATE_DMG_TARBALL_URL" | tar -xzf -` then `chmod +x` — unverified remote
       code executed during every release build, including in CI
-- [ ] fail the build loudly on checksum mismatch rather than falling through
-- [ ] ⚠️ **compute the hash locally and cross-check it against upstream's**
+- [x] fail the build loudly on checksum mismatch rather than falling through
+- [x] ⚠️ **compute the hash locally and cross-check it against upstream's**
       (`8cf7b4ae540801171f4f630f1f2956913aaa87483b7ac03458f52b6cd0c48953` in `#43`) rather than
       trusting either value blindly — a pinned hash you didn't verify is theatre
-- [ ] comment the update procedure in the script next to the constant: a stale hash after a
+- [x] comment the update procedure in the script next to the constant: a stale hash after a
       `CREATE_DMG_VERSION` bump will block **every PR's CI**, since CI runs `make release-artifacts`
-- [ ] note upstream's paths are pre-`macos/`-restructure — port, don't cherry-pick
-- [ ] **no unit test** — and this is not a gap: CI already runs `make release-artifacts` on every
+- [x] note upstream's paths are pre-`macos/`-restructure — port, don't cherry-pick
+- [x] **no unit test** — and this is not a gap: CI already runs `make release-artifacts` on every
       PR, so the codesign and DMG paths are regression-covered. Record `make app` +
       `codesign -v` output in the PR description
-- [ ] run `cd macos && swift test` — must pass before Task 10
+- [x] run `cd macos && swift test` — must pass before Task 10
 - [ ] push branch, open PR, confirm CI green, merge
 
 ### Task 10: Add right-click-to-quit on the menu bar icon
