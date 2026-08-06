@@ -383,26 +383,26 @@ Branch: `fix/reset-label-granularity` — **our own regression**, introduced by 
 - Modify: `macos/Sources/ClaudeUsageBar/PopoverView.swift`
 - Create: `macos/Tests/ClaudeUsageBarTests/ResetLabelFormatterTests.swift`
 
-- [ ] read `git show a9ed221` first — the deleted code is the behavioural spec
-- [ ] create `ResetLabelFormatter.swift` with an **`internal`** function (not `private`, and in
+- [x] read `git show a9ed221` first — the deleted code is the behavioural spec
+- [x] create `ResetLabelFormatter.swift` with an **`internal`** function (not `private`, and in
       its own file so the test can see it)
-- [ ] implement with `DateComponentsFormatter`: `allowedUnits: [.day, .hour, .minute]`,
+- [x] implement with `DateComponentsFormatter`: `allowedUnits: [.day, .hour, .minute]`,
       `maximumUnitCount = 2`, `unitsStyle = .abbreviated`, `zeroFormattingBehavior = .dropAll`
-- [ ] preserve the `"Resets in …"` phrasing including the word "in", and the `"Resetting…"`
+- [x] preserve the `"Resets in …"` phrasing including the word "in", and the `"Resetting…"`
       case for non-future dates
-- [ ] call it from `UsageBucketRow.resetText(for:now:)` (~`PopoverView.swift:352`)
-- [ ] leave `AccountContentView.agoText(for:now:)` (~`:271`) on `RelativeDateTimeFormatter`;
+- [x] call it from `UsageBucketRow.resetText(for:now:)` (~`PopoverView.swift:352`)
+- [x] leave `AccountContentView.agoText(for:now:)` (~`:271`) on `RelativeDateTimeFormatter`;
       state the reasoning in the PR description
-- [ ] ⚠️ pin the formatter's `calendar.locale` (or inject it) — `.abbreviated` output is
+- [x] ⚠️ pin the formatter's `calendar.locale` (or inject it) — `.abbreviated` output is
       localized, so unpinned assertions on `3h 50m` are environment-dependent and can drift in CI
-- [ ] **decide the day-scale case**: the `a9ed221` spec emitted days+hours only (`Resets in 3d`
+- [x] **decide the day-scale case**: the `a9ed221` spec emitted days+hours only (`Resets in 3d`
       when hours == 0), whereas `[.day, .hour, .minute]` + `maximumUnitCount = 2` + `.dropAll`
       turns 3d 0h 50m into `3d 50m`. Pick one and test it explicitly
-- [ ] write tests: `3h 50m`, `6d 17h`, sub-hour (`50m`), exact-hour (must be `3h`, not `3h 0m`)
-- [ ] write tests: the 3d-0h-50m case, asserting whichever behaviour was chosen above
-- [ ] write tests: past/zero dates yield `"Resetting…"`, never negative output
-- [ ] run `cd macos && swift test` — must pass before Task 6
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] write tests: `3h 50m`, `6d 17h`, sub-hour (`50m`), exact-hour (must be `3h`, not `3h 0m`)
+- [x] write tests: the 3d-0h-50m case, asserting whichever behaviour was chosen above
+- [x] write tests: past/zero dates yield `"Resetting…"`, never negative output
+- [x] run `cd macos && swift test` — must pass before Task 6
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 6: Add 5-hour usage projection graph and run-out estimate
 
