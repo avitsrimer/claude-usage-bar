@@ -340,6 +340,14 @@ Branch: `fix/history-flush-durability-and-perms` — upstream `#57` + `#43`'s pe
 
 ### Task 4: Add fetch re-entrancy guard and refresh spinner
 
+⚠️ Merged without a green CI check: GitHub had an active Minor Service Outage (githubstatus.com,
+`indicator: "minor"`) at merge time, the same one that affected PR #4 (Task 3). PR #5's CI run
+was stuck `pending` well past its normal start time, consistent with the "Getting action download
+info" infra failure already documented on PR #4, not a code issue. Verified locally instead:
+`swift test` 72/72 passed on the branch (run 3x to check for flakiness in the new
+concurrency-sensitive tests), diff manually scanned for trailing commas (none found).
+**Needs retroactive CI confirmation on `main` once GitHub recovers** — see Task 11.
+
 Branch: `feat/fetch-reentrancy-guard-and-spinner` — ports upstream `#51`.
 **First of five consecutive `PopoverView` tasks — start from freshly-merged `main`.**
 
