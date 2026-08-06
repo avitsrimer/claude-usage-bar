@@ -10,6 +10,12 @@ ZIP_PATH="$PROJECT_DIR/$APP_NAME.zip"
 DMG_PATH="$PROJECT_DIR/$APP_NAME.dmg"
 CREATE_DMG_VERSION="v1.2.3"
 CREATE_DMG_TARBALL_URL="https://github.com/create-dmg/create-dmg/archive/refs/tags/${CREATE_DMG_VERSION}.tar.gz"
+# Update procedure when bumping CREATE_DMG_VERSION:
+#   1. curl -fsSL "https://github.com/create-dmg/create-dmg/archive/refs/tags/<new-version>.tar.gz" -o /tmp/create-dmg.tar.gz
+#   2. shasum -a 256 /tmp/create-dmg.tar.gz
+#   3. paste the resulting hash below. A stale hash after a version bump fails every PR's
+#      CI, since CI runs `make release-artifacts`.
+CREATE_DMG_TARBALL_SHA256="8cf7b4ae540801171f4f630f1f2956913aaa87483b7ac03458f52b6cd0c48953"
 DMG_RESOURCES_DIR="$PROJECT_DIR/Resources/dmg"
 DMG_BACKGROUND_SOURCE="$DMG_RESOURCES_DIR/background.png"
 APP_ICON_SOURCE="$PROJECT_DIR/Resources/AppIcon.icns"
@@ -116,6 +122,9 @@ build_app_bundle() {
         ditto "$sparkle_framework" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
     fi
 
+    echo "==> Stripping extended attributes..."
+    xattr -cr "$APP_BUNDLE"
+
     echo "==> Codesigning (ad-hoc)..."
     if [[ -d "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" ]]; then
         while IFS= read -r nested_bundle; do
@@ -187,7 +196,24 @@ create_dmg() {
 
     ditto "$APP_BUNDLE" "$staging_dir/$APP_NAME.app"
     create_applications_alias "$staging_dir"
-    curl -fsSL "$CREATE_DMG_TARBALL_URL" | tar -xzf - -C "$create_dmg_root" --strip-components=1
+
+    local create_dmg_tarball="$create_dmg_root/create-dmg.tar.gz"
+    curl -fsSL "$CREATE_DMG_TARBALL_URL" -o "$create_dmg_tarball"
+
+    local actual_sha256
+    actual_sha256="$(shasum -a 256 "$create_dmg_tarball" | awk '{print $1}')"
+    if [[ "$actual_sha256" != "$CREATE_DMG_TARBALL_SHA256" ]]; then
+        echo "Error: create-dmg tarball checksum mismatch for $CREATE_DMG_TARBALL_URL"
+        echo "  expected: $CREATE_DMG_TARBALL_SHA256"
+        echo "  actual:   $actual_sha256"
+        echo "If this is an intentional CREATE_DMG_VERSION bump, update CREATE_DMG_TARBALL_SHA256"
+        echo "in build.sh per the comment next to it."
+        rm -rf "$create_dmg_root"
+        rm -rf "$staging_dir"
+        exit 1
+    fi
+
+    tar -xzf "$create_dmg_tarball" -C "$create_dmg_root" --strip-components=1
     chmod +x "$create_dmg_tool"
 
     create_dmg_args=(
