@@ -9,12 +9,31 @@ Have you ever found yourself refreshing the Claude usage page, wondering how clo
 Now it's just a glimpse away — always sitting at the top of your screen.
 
 <p align="center">
-  <img src="macos/Resources/demo.png" width="400" alt="Claude Usage Bar demo">
+  <img src="macos/Resources/demo.jpg" width="400" alt="Claude Usage Bar demo">
 </p>
 
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
 ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/license-BSD--2--Clause-green)
+
+## Fork improvements
+
+This is a fork of [Blimp-Labs/claude-usage-bar](https://github.com/Blimp-Labs/claude-usage-bar) with the following additions and fixes:
+
+**Features**
+- **Multi-account support** — add multiple Claude accounts, switch between them via tabs, set optional display aliases. The menu bar icon always reflects the active account. Can be toggled off in Settings when only one account is needed.
+
+**Performance**
+- **Near-zero CPU when idle** — the original used `Text(date, style: .relative)` for reset timers and "last updated", which hooks into a display-link and continuously re-renders the view even with the popover closed (~4% constant CPU). Replaced with `RelativeDateTimeFormatter` strings updated by a 60s timer that only runs while the popover is open.
+- **Reduced memory footprint** — switched from `URLSession.shared` (which allocates a persistent HTTP cache on disk and in memory) to an ephemeral session. Authenticated API responses are never cacheable anyway. Memory dropped from 350MB to 38MB.
+
+**Bug fixes**
+- Token refresh now also triggers on HTTP 429, so the next poll uses a fresh rate-limit window
+- Proactive token refresh leeway increased to `pollingInterval + 5 min` to avoid mid-poll expiry
+- Menu bar icon now shows the correct account immediately after switching (was reading `activeAccountId` in `willSet` before the property updated)
+- Polling interval picker no longer snaps back after changing (extracted as `@ObservedObject` subview so SwiftUI tracks changes correctly)
+- Window position preserved on account switch — prevents the popover drifting off-screen in full-screen spaces with auto-hiding menu bar
+- `UNUserNotificationCenter` setup deferred to `requestPermission()` — fixes crash in the command-line test runner
 
 ## What it does
 
@@ -25,6 +44,7 @@ A tiny macOS menu bar app that shows your Claude API usage at a glance. Click it
 - Extra usage tracking with USD currency display
 - Usage history chart — see how your usage evolves over time (1h / 6h / 1d / 7d / 30d)
 - Hover over the chart to see exact values at any point
+- **Multi-account support** — add multiple Claude accounts, switch between them via tabs, set optional aliases
 - Configurable polling interval (5m / 15m / 30m / 1h)
 - Built-in update checks via Sparkle
 - Just sign in — OAuth via browser, no API keys to manage
@@ -65,14 +85,25 @@ Click the icon anytime to see:
 - Extra usage credits and limits
 - Usage history chart with adjustable time range and hover details
 
+### Multiple accounts
+
+To track more than one Claude account, open **Settings → Accounts** and click **Add Account**. Each account gets its own tab in the popover. You can set a display alias for each account to tell them apart at a glance. The menu bar icon always reflects the active (frontmost) account.
+
+## Security
+
+The app requests two OAuth scopes: `user:profile` (required to read usage and account email) and `user:inference` (part of the standard Claude session grant). Despite the name, `user:inference` does **not** enable making Claude API calls — Anthropic actively rejects OAuth tokens on `POST /v1/messages` with `"OAuth authentication is currently not supported"`. Only API keys work for inference; the token this app holds is read-only in practice.
+
 ## Data storage
 
 All data is stored locally in `~/.config/claude-usage-bar/`:
 
-| File | Purpose |
-|------|---------|
-| `token` | OAuth access token (permissions: `0600`) |
-| `history.json` | Usage history for the chart (30-day retention) |
+| Location | Purpose |
+|----------|---------|
+| `accounts.json` | Account list and active account ID |
+| Keychain (`claude-usage-bar` service) | OAuth tokens, one entry per account ID |
+| `history-{id}.json` | Usage history for each account (30-day retention) |
+
+Existing single-account installs are migrated automatically on first launch: legacy credential files and `history.json` are converted to the new per-account format and an `accounts.json` is created.
 
 History is buffered in memory and flushed to disk every 5 minutes and on app quit. No data is sent anywhere other than the Anthropic API.
 
@@ -136,16 +167,19 @@ https://blimp-labs.github.io/claude-usage-bar/appcast.xml
 macos/                           # macOS menu bar app (Swift/SwiftUI)
 ├── Sources/ClaudeUsageBar/
 │   ├── ClaudeUsageBarApp.swift      # App entry point, menu bar setup
+│   ├── AccountManager.swift         # Multi-account service locator
+│   ├── AccountEntry.swift           # Account model (id, email, alias)
 │   ├── UsageService.swift           # OAuth, polling, API calls
 │   ├── UsageModel.swift             # API response types
 │   ├── UsageHistoryModel.swift      # History data types, time ranges
 │   ├── UsageHistoryService.swift    # Persistence, downsampling
 │   ├── UsageChartView.swift         # Swift Charts trajectory view
-│   ├── PopoverView.swift            # Main popover UI
-│   ├── SettingsView.swift           # Settings window
+│   ├── PopoverView.swift            # Main popover UI (per-account tabs)
+│   ├── SettingsView.swift           # Settings window (accounts, thresholds)
 │   ├── NotificationService.swift    # Usage threshold notifications
 │   ├── MenuBarIconRenderer.swift    # Menu bar icon drawing
 │   ├── PollingOptionFormatter.swift # Polling interval display labels
+│   ├── AppPaths.swift               # Shared config directory path
 │   ├── AppUpdater.swift             # Sparkle update integration
 │   └── Resources/
 │       ├── claude-logo.png          # Pre-rendered menu bar logo (512px)

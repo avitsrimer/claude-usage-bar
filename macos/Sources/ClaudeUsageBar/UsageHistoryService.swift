@@ -13,14 +13,14 @@ class UsageHistoryService: ObservableObject {
     private static let retentionInterval: TimeInterval = 30 * 86400 // 30 days
     private static let flushInterval: TimeInterval = 300 // 5 minutes
 
-    private static var historyFileURL: URL {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/claude-usage-bar", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("history.json")
-    }
+    private let historyFileURL: URL
 
-    init() {
+    init(
+        accountId: String,
+        directoryURL: URL = AppPaths.configDirectoryURL
+    ) {
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        self.historyFileURL = directoryURL.appendingPathComponent("history-\(accountId).json")
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil, queue: .main
@@ -41,7 +41,7 @@ class UsageHistoryService: ObservableObject {
     // MARK: - Load
 
     func loadHistory() {
-        let url = Self.historyFileURL
+        let url = historyFileURL
         guard FileManager.default.fileExists(atPath: url.path) else { return }
 
         do {
@@ -51,7 +51,7 @@ class UsageHistoryService: ObservableObject {
             history = loaded
         } catch {
             // Corrupt file — rename to .bak and start fresh
-            let backup = url.deletingPathExtension().appendingPathExtension("bak.json")
+            let backup = historyFileURL.deletingPathExtension().appendingPathExtension("bak.json")
             try? FileManager.default.removeItem(at: backup)
             try? FileManager.default.moveItem(at: url, to: backup)
             history = UsageHistory()
@@ -74,7 +74,7 @@ class UsageHistoryService: ObservableObject {
         history.dataPoints = pruned(history.dataPoints)
 
         guard let data = try? JSONEncoder.historyEncoder.encode(history) else { return }
-        try? data.write(to: Self.historyFileURL, options: .atomic)
+        try? data.write(to: historyFileURL, options: .atomic)
 
         isDirty = false
         flushTimer?.cancel()
@@ -85,7 +85,7 @@ class UsageHistoryService: ObservableObject {
         guard flushTimer == nil else { return }
         flushTimer = Timer.publish(every: Self.flushInterval, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
+            .sink { @MainActor [weak self] _ in
                 self?.flushToDisk()
             }
     }

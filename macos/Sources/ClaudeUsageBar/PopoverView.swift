@@ -1,49 +1,162 @@
 import SwiftUI
 
+private let relativeDateFormatter: RelativeDateTimeFormatter = {
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .full
+    return f
+}()
+
 struct PopoverView: View {
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var appUpdater: AppUpdater
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if accountManager.multiAccountEnabled && accountManager.accounts.count > 1 {
+                AccountTabBar(accountManager: accountManager)
+                Divider()
+            }
+
+            if let service = accountManager.activeService,
+               let historyService = accountManager.activeHistoryService,
+               let notificationService = accountManager.activeNotificationService {
+                AccountContentView(
+                    service: service,
+                    historyService: historyService,
+                    notificationService: notificationService,
+                    appUpdater: appUpdater,
+                    onRemove: {
+                        if let id = accountManager.activeAccountId {
+                            accountManager.removeAccount(id: id)
+                        }
+                    }
+                )
+            } else {
+                noAccountView
+            }
+        }
+        .frame(width: 340)
+        .background(WindowPositionPreserver(trigger: accountManager.activeAccountId))
+    }
+
+    private var noAccountView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Claude Usage")
+                .font(.headline)
+            Text("Add an account to get started.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("Add Account") {
+                accountManager.addAccount()
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity)
+            Divider()
+            HStack {
+                settingsButton
+                Spacer()
+                Button("Quit") { NSApplication.shared.terminate(nil) }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+    }
+
+    private var settingsButton: some View {
+        SettingsLink { Text("Settings…") }
+            .buttonStyle(.borderless)
+            .font(.caption)
+    }
+}
+
+// MARK: - Tab Bar
+
+private struct AccountTabBar: View {
+    @ObservedObject var accountManager: AccountManager
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                Picker("", selection: Binding(
+                    get: { accountManager.activeAccountId },
+                    set: {
+                        accountManager.activeAccountId = $0
+                        accountManager.saveAccounts()
+                    }
+                )) {
+                    ForEach(accountManager.accounts) { account in
+                        Text(account.displayName()).tag(Optional(account.id))
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+
+            Button {
+                accountManager.addAccount()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .buttonStyle(.borderless)
+            .help("Add Account")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Account Content
+
+private struct AccountContentView: View {
     @ObservedObject var service: UsageService
     @ObservedObject var historyService: UsageHistoryService
     @ObservedObject var notificationService: NotificationService
     @ObservedObject var appUpdater: AppUpdater
-    @AppStorage("setupComplete") private var setupComplete = false
+    let onRemove: () -> Void
+
+    @State private var now = Date()
+    @State private var minuteTimer: Timer?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if !setupComplete && !service.isAuthenticated {
-                SetupView(
-                    service: service,
-                    notificationService: notificationService,
-                    onComplete: { setupComplete = true }
-                )
+            Text("Claude Usage")
+                .font(.headline)
+            if service.isAwaitingCode {
+                CodeEntryView(service: service)
+            } else if !service.isAuthenticated {
+                signInView
             } else {
-                Text("Claude Usage")
-                    .font(.headline)
-                if !service.isAuthenticated {
-                    signInView
-                } else {
-                    usageView
-                }
+                usageView
             }
         }
         .padding()
-        .frame(width: 340)
+        .onAppear {
+            now = Date()
+            minuteTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                now = Date()
+            }
+        }
+        .onDisappear {
+            minuteTimer?.invalidate()
+            minuteTimer = nil
+        }
     }
 
     @ViewBuilder
     private var signInView: some View {
-        if service.isAwaitingCode {
-            CodeEntryView(service: service)
-        } else {
-            Text("Sign in to view your usage.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        Text("Sign in to view your usage.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
 
-            Button("Sign in with Claude") {
-                service.startOAuthFlow()
-            }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity)
+        Button("Sign in with Claude") {
+            service.startOAuthFlow()
         }
+        .buttonStyle(.borderedProminent)
+        .frame(maxWidth: .infinity)
 
         if let error = service.lastError {
             Label(error, systemImage: "exclamationmark.triangle")
@@ -55,10 +168,14 @@ struct PopoverView: View {
         HStack {
             settingsButton
             Spacer()
-            Button("Quit") {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.borderless)
+            Button("Remove Account", action: onRemove)
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Quit") { NSApplication.shared.terminate(nil) }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -66,12 +183,14 @@ struct PopoverView: View {
     private var usageView: some View {
         UsageBucketRow(
             label: "5-Hour Window",
-            bucket: service.usage?.fiveHour
+            bucket: service.usage?.fiveHour,
+            now: now
         )
 
         UsageBucketRow(
             label: "7-Day Window",
-            bucket: service.usage?.sevenDay
+            bucket: service.usage?.sevenDay,
+            now: now
         )
 
         if let opus = service.usage?.sevenDayOpus,
@@ -80,9 +199,9 @@ struct PopoverView: View {
             Text("Per-Model (7 day)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            UsageBucketRow(label: "Opus", bucket: opus)
+            UsageBucketRow(label: "Opus", bucket: opus, now: now)
             if let sonnet = service.usage?.sevenDaySonnet {
-                UsageBucketRow(label: "Sonnet", bucket: sonnet)
+                UsageBucketRow(label: "Sonnet", bucket: sonnet, now: now)
             }
         }
 
@@ -112,7 +231,7 @@ struct PopoverView: View {
 
         HStack(spacing: 12) {
             if let updated = service.lastUpdated {
-                Text("Updated \(updated, style: .relative) ago")
+                Text("Updated \(agoText(for: updated, now: now))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -143,98 +262,15 @@ struct PopoverView: View {
     }
 
     private var settingsButton: some View {
-        SettingsLink {
-            Text("Settings…")
-        }
-        .buttonStyle(.borderless)
-        .font(.caption)
+        SettingsLink { Text("Settings…") }
+            .buttonStyle(.borderless)
+            .font(.caption)
     }
-}
 
-// MARK: - Setup (first launch)
-
-private struct SetupView: View {
-    @ObservedObject var service: UsageService
-    @ObservedObject var notificationService: NotificationService
-    var onComplete: () -> Void
-
-    var body: some View {
-        Text("Welcome")
-            .font(.headline)
-        Text("Configure your preferences to get started.")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-
-        Divider()
-
-        LaunchAtLoginToggle(controlSize: .small, useSwitchStyle: true)
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Notifications")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            SetupThresholdSlider(
-                label: "5-hour window",
-                value: notificationService.threshold5h,
-                onChange: { notificationService.setThreshold5h($0) }
-            )
-            SetupThresholdSlider(
-                label: "7-day window",
-                value: notificationService.threshold7d,
-                onChange: { notificationService.setThreshold7d($0) }
-            )
-            SetupThresholdSlider(
-                label: "Extra usage",
-                value: notificationService.thresholdExtra,
-                onChange: { notificationService.setThresholdExtra($0) }
-            )
-        }
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Polling Interval")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Picker("", selection: Binding(
-                get: { service.pollingMinutes },
-                set: { service.updatePollingInterval($0) }
-            )) {
-                ForEach(UsageService.pollingOptions, id: \.self) { mins in
-                    Text(localizedPollingInterval(for: mins, locale: .autoupdatingCurrent))
-                        .tag(mins)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            if isDiscouragedPollingOption(service.pollingMinutes) {
-                Text("Frequent polling may cause rate limiting")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
-        }
-
-        Divider()
-
-        Button("Get Started") {
-            onComplete()
-        }
-        .buttonStyle(.borderedProminent)
-        .frame(maxWidth: .infinity)
-
-        HStack {
-            Spacer()
-            Button("Quit") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+    private func agoText(for date: Date, now: Date) -> String {
+        relativeDateFormatter.localizedString(for: date, relativeTo: now)
     }
+
 }
 
 // MARK: - Subviews
@@ -284,6 +320,7 @@ private struct CodeEntryView: View {
 private struct UsageBucketRow: View {
     let label: String
     let bucket: UsageBucket?
+    let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -298,9 +335,11 @@ private struct UsageBucketRow: View {
             ProgressView(value: (bucket?.utilization ?? 0) / 100.0, total: 1.0)
                 .tint(colorForPct((bucket?.utilization ?? 0) / 100.0))
             if let resetDate = bucket?.resetsAtDate {
-                Text("Resets \(resetDate, style: .relative)")
+                Text(resetText(for: resetDate, now: now))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            } else {
+                Text(" ").font(.caption2)
             }
         }
     }
@@ -308,6 +347,11 @@ private struct UsageBucketRow: View {
     private var percentageText: String {
         guard let pct = bucket?.utilization else { return "—" }
         return "\(Int(round(pct)))%"
+    }
+
+    private func resetText(for date: Date, now: Date) -> String {
+        guard date > now else { return "Resetting…" }
+        return "Resets " + relativeDateFormatter.localizedString(for: date, relativeTo: now)
     }
 }
 
@@ -337,38 +381,40 @@ private struct ExtraUsageRow: View {
     }
 }
 
-private struct SetupThresholdSlider: View {
-    let label: String
-    let value: Int
-    let onChange: (Int) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label)
-                    .font(.callout)
-                Spacer()
-                Text(value > 0 ? "\(value)%" : "Off")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Slider(
-                value: Binding(
-                    get: { Double(value) },
-                    set: { onChange(Int($0)) }
-                ),
-                in: 0...100,
-                step: 5
-            )
-            .controlSize(.small)
-        }
-    }
-}
-
 private func colorForPct(_ pct: Double) -> Color {
     switch pct {
     case ..<0.60: return .green
     case 0.60..<0.80: return .yellow
     default: return .red
+    }
+}
+
+// MARK: - Window Position Preserver
+
+/// Preserves the NSWindow origin when content changes size (e.g. account switching),
+/// preventing MenuBarExtra from repositioning the window off-screen on full-screen spaces.
+private struct WindowPositionPreserver: NSViewRepresentable {
+    let trigger: String?
+
+    class Coordinator {
+        var savedOrigin: NSPoint?
+        var lastTrigger: String? = "initial"
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let window = nsView.window else { return }
+        guard context.coordinator.lastTrigger != trigger else { return }
+
+        context.coordinator.savedOrigin = window.frame.origin
+        context.coordinator.lastTrigger = trigger
+
+        DispatchQueue.main.async {
+            if let origin = context.coordinator.savedOrigin {
+                window.setFrameOrigin(origin)
+            }
+        }
     }
 }
