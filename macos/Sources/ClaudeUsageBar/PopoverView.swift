@@ -382,8 +382,7 @@ private struct UsageBucketRow: View {
     }
 
     private func resetText(for date: Date, now: Date) -> String {
-        guard date > now else { return "Resetting…" }
-        return "Resets " + relativeDateFormatter.localizedString(for: date, relativeTo: now)
+        formatResetCountdown(from: date, now: now)
     }
 }
 
