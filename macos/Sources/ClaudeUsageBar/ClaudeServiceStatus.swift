@@ -82,14 +82,28 @@ struct StatusIncident: Sendable, Equatable, Identifiable, Codable {
     let impact: String        // "none" | "minor" | "major" | "critical" | "maintenance"
     let shortlink: URL?
     let updatedAt: Date?
+    /// IDs of the components this incident affects, per the Statuspage.io v2 incident schema.
+    /// Used by `StatusSnapshot.make` to scope `activeIncidents` to the monitored components —
+    /// an empty list (e.g. a fixture/payload that omits the field) means "unscoped", so such an
+    /// incident is not excluded by the filter.
+    let componentIds: [String]
 
-    init(id: String, name: String, status: String, impact: String, shortlink: URL? = nil, updatedAt: Date? = nil) {
+    init(
+        id: String,
+        name: String,
+        status: String,
+        impact: String,
+        shortlink: URL? = nil,
+        updatedAt: Date? = nil,
+        componentIds: [String] = []
+    ) {
         self.id = id
         self.name = name
         self.status = status
         self.impact = impact
         self.shortlink = shortlink
         self.updatedAt = updatedAt
+        self.componentIds = componentIds
     }
 }
 
@@ -139,10 +153,19 @@ struct StatusSnapshot: Sendable, Equatable {
         let monitored = summary.components.filter { filter.matches($0) }
         let impacted = monitored.filter { $0.status.severity > 0 }
         let rollup = monitored.map(\.status).rolledUp()
+        let monitoredIds = Set(monitored.map(\.id))
+        // Scope incidents to ones touching a monitored component, so an unrelated incident
+        // (e.g. on a docs/console component) never gets shown as the reason for a monitored
+        // component's degraded rollup. An incident with no component list at all (schema drift,
+        // or a payload that omits the field) is treated as unscoped and kept, rather than
+        // silently hidden.
+        let scopedIncidents = summary.incidents.filter { incident in
+            incident.componentIds.isEmpty || incident.componentIds.contains { monitoredIds.contains($0) }
+        }
         return StatusSnapshot(
             rollup: rollup,
             impactedComponents: impacted,
-            activeIncidents: summary.incidents,
+            activeIncidents: scopedIncidents,
             allMonitoredComponents: monitored,
             fetchedAt: now
         )

@@ -89,6 +89,54 @@ final class UsageHistoryServiceTests: XCTestCase {
         XCTAssertEqual(decoded.dataPoints[0].pct5h, 2)
     }
 
+    // MARK: - Flush failure paths
+
+    /// `createFile` fails when the containing directory has no write permission. `flushToDisk`
+    /// must not crash and must leave no history file behind (the `guard created else { return }`
+    /// branch, which never reaches `replaceItemAt`).
+    func testFlushToDiskDoesNotCrashWhenDirectoryIsNotWritable() throws {
+        let service = UsageHistoryService(accountId: "acct-1", directoryURL: directoryURL)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directoryURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directoryURL.path)
+        }
+
+        service.recordDataPoint(pct5h: 1, pct7d: 2)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: historyFileURL().path))
+        let leftover = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+            .filter { $0.hasSuffix(".tmp") }
+        XCTAssertTrue(leftover.isEmpty, "createFile failing must not leave an orphaned temp file")
+    }
+
+    /// `replaceItemAt` fails when the destination is immutable (`chflags uchg`), even though
+    /// the containing directory (and therefore `createFile` for the temp file) is writable.
+    /// The `catch` block must remove the orphaned temp file and leave the immutable file
+    /// untouched, without crashing.
+    func testFlushToDiskCleansUpTempFileWhenReplaceItemFails() throws {
+        let url = historyFileURL()
+        let service = UsageHistoryService(accountId: "acct-1", directoryURL: directoryURL)
+        service.recordDataPoint(pct5h: 1, pct7d: 2)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: url.path)
+        defer {
+            try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: url.path)
+        }
+
+        let before = try Data(contentsOf: url)
+
+        service.recordDataPoint(pct5h: 3, pct7d: 4)
+
+        let after = try Data(contentsOf: url)
+        XCTAssertEqual(before, after, "the immutable destination must be left untouched on replaceItemAt failure")
+
+        let leftover = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+            .filter { $0.hasSuffix(".tmp") }
+        XCTAssertTrue(leftover.isEmpty, "temp file must be removed when replaceItemAt fails")
+    }
+
     // MARK: - Corrupt file recovery
 
     func testCorruptFileMovesToBakAndHistoryResets() throws {

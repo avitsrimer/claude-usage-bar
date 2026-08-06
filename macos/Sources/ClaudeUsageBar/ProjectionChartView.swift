@@ -57,7 +57,7 @@ struct ProjectionChartView: View {
 
     // MARK: - Chart
 
-    private struct ProjPoint: Identifiable {
+    struct ProjPoint: Identifiable {
         let id = UUID()
         let date: Date
         let pct: Double
@@ -65,7 +65,10 @@ struct ProjectionChartView: View {
 
     /// Drawing parameters derived from a projection (kept out of the `@ViewBuilder` so the
     /// imperative branching below is treated as plain code, not view content).
-    private struct ChartGeometry {
+    /// `internal`, not `private` — this is the pure clamping/branching logic that decides the
+    /// chart's rendered endpoint, color, and run-out line, so it's unit-tested the same way
+    /// `UsageProjection.compute` is, without constructing a `View`.
+    struct ChartGeometry {
         let points: [ProjPoint]
         let color: Color
         let runsOutDate: Date?
@@ -73,7 +76,9 @@ struct ProjectionChartView: View {
         let startPct: Double
     }
 
-    private func geometry(projection: UsageProjection, reset: Date) -> ChartGeometry {
+    /// Pure function of `projection`/`reset` — doesn't touch `self` — so it's `static` and
+    /// `internal` for direct unit testing.
+    static func geometry(projection: UsageProjection, reset: Date) -> ChartGeometry {
         let now = projection.now
         let startPct = projection.currentPct * 100
 
@@ -103,7 +108,7 @@ struct ProjectionChartView: View {
 
     @ViewBuilder
     private func chart(projection: UsageProjection, reset: Date) -> some View {
-        let geo = geometry(projection: projection, reset: reset)
+        let geo = Self.geometry(projection: projection, reset: reset)
 
         Chart {
             // 100% limit reference.

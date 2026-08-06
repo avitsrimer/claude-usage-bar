@@ -111,7 +111,7 @@ All data is stored locally in `~/.config/claude-usage-bar/`:
 
 Existing single-account installs are migrated automatically on first launch: legacy credential files and `history.json` are converted to the new per-account format and an `accounts.json` is created.
 
-History is buffered in memory and flushed to disk every 5 minutes and on app quit. No data is sent anywhere other than the Anthropic API.
+History is buffered in memory and flushed to disk immediately after every recorded data point (not on a timer), so it survives reboot, force-quit, or a crash, not just a clean quit. No data is sent anywhere other than the Anthropic API.
 
 ## Development
 
@@ -172,21 +172,32 @@ https://blimp-labs.github.io/claude-usage-bar/appcast.xml
 ```
 macos/                           # macOS menu bar app (Swift/SwiftUI)
 ├── Sources/ClaudeUsageBar/
-│   ├── ClaudeUsageBarApp.swift      # App entry point, menu bar setup
-│   ├── AccountManager.swift         # Multi-account service locator
-│   ├── AccountEntry.swift           # Account model (id, email, alias)
-│   ├── UsageService.swift           # OAuth, polling, API calls
-│   ├── UsageModel.swift             # API response types
-│   ├── UsageHistoryModel.swift      # History data types, time ranges
-│   ├── UsageHistoryService.swift    # Persistence, downsampling
-│   ├── UsageChartView.swift         # Swift Charts trajectory view
-│   ├── PopoverView.swift            # Main popover UI (per-account tabs)
-│   ├── SettingsView.swift           # Settings window (accounts, thresholds)
-│   ├── NotificationService.swift    # Usage threshold notifications
-│   ├── MenuBarIconRenderer.swift    # Menu bar icon drawing
-│   ├── PollingOptionFormatter.swift # Polling interval display labels
-│   ├── AppPaths.swift               # Shared config directory path
-│   ├── AppUpdater.swift             # Sparkle update integration
+│   ├── ClaudeUsageBarApp.swift          # App entry point, menu bar setup
+│   ├── AccountManager.swift             # Multi-account service locator
+│   ├── AccountEntry.swift               # Account model (id, email, alias)
+│   ├── UsageService.swift               # OAuth, polling, API calls
+│   ├── UsageModel.swift                 # API response types
+│   ├── UsageHistoryModel.swift          # History data types, time ranges
+│   ├── UsageHistoryService.swift        # Persistence, downsampling
+│   ├── UsageChartView.swift             # Swift Charts trajectory view
+│   ├── UsageProjection.swift            # 5h usage run-out projection (pure math)
+│   ├── ProjectionChartView.swift        # Projection chart rendered in the popover
+│   ├── ResetLabelFormatter.swift        # Two-unit "Resets in 3h 50m" countdown formatting
+│   ├── PopoverView.swift                # Main popover UI (per-account tabs)
+│   ├── SettingsView.swift               # Settings window (accounts, thresholds, service-status toggle)
+│   ├── NotificationService.swift        # Usage threshold notifications
+│   ├── MenuBarIconRenderer.swift        # Menu bar icon drawing
+│   ├── RightClickableMenuBarLabel.swift # Right-click-to-quit on the menu bar icon
+│   ├── PollingOptionFormatter.swift     # Polling interval display labels
+│   ├── StatusMonitor.swift              # Service-status poller (status.claude.com)
+│   ├── StatusPageClient.swift           # HTTP fetch + decode for the statuspage.io summary
+│   ├── StatusPageModels.swift           # Wire DTOs for the statuspage.io summary JSON
+│   ├── ClaudeServiceStatus.swift        # Service-status domain model + rollup/filter logic
+│   ├── ServiceStatusDisplayState.swift  # Maps a status snapshot to what the popover renders
+│   ├── AppPaths.swift                   # Shared config directory path
+│   ├── AppResources.swift               # Bundle-resource lookups
+│   ├── AppUpdater.swift                 # Sparkle update integration
+│   ├── StoredCredentials.swift          # Keychain-backed OAuth credential storage
 │   └── Resources/
 │       ├── claude-logo.png          # Pre-rendered menu bar logo (512px)
 │       └── en.lproj/Localizable.strings

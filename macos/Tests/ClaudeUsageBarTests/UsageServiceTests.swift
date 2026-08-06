@@ -1,10 +1,26 @@
 import XCTest
+import Security
 @testable import ClaudeUsageBar
 
 @MainActor
 final class UsageServiceTests: XCTestCase {
+    // Unique per test run so Keychain state never leaks between tests or into the real
+    // production "claude-usage-bar" service name — matches the convention in
+    // StoredCredentialsTests/AccountManagerTests.
+    private var keychainService: String!
+
+    override func setUp() {
+        super.setUp()
+        keychainService = "claude-usage-bar-test-\(UUID().uuidString)"
+    }
+
     override func tearDown() {
         MockURLProtocol.handler = nil
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService!
+        ]
+        SecItemDelete(query as CFDictionary)
         super.tearDown()
     }
 
@@ -445,6 +461,52 @@ final class UsageServiceTests: XCTestCase {
         XCTAssertFalse(service.isAwaitingCode)
     }
 
+    func testSubmitOAuthCodeWithNoPendingFlowSetsErrorAndDoesNotCrash() async throws {
+        let store = try makeStore()
+        let service = UsageService(
+            session: makeSession(),
+            usageEndpoint: URL(string: "https://example.com/api/oauth/usage")!,
+            userinfoEndpoint: URL(string: "https://example.com/api/oauth/userinfo")!,
+            tokenEndpoint: URL(string: "https://example.com/v1/oauth/token")!,
+            credentialsStore: store,
+            urlOpener: { _ in true }
+        )
+
+        // startOAuthFlow() was never called, so both oauthState and codeVerifier are nil —
+        // this is the "No pending OAuth flow" branch, reachable via a double-submit or a
+        // bare paste with no active flow.
+        XCTAssertFalse(service.isAwaitingCode)
+
+        await service.submitOAuthCode("some-code#some-state")
+
+        XCTAssertEqual(service.lastError, "No pending OAuth flow")
+        XCTAssertFalse(service.isAwaitingCode)
+    }
+
+    func testSubmitOAuthCodeDoubleSubmitAfterRejectionHitsNoPendingFlowBranch() async throws {
+        let store = try makeStore()
+        let service = UsageService(
+            session: makeSession(),
+            usageEndpoint: URL(string: "https://example.com/api/oauth/usage")!,
+            userinfoEndpoint: URL(string: "https://example.com/api/oauth/userinfo")!,
+            tokenEndpoint: URL(string: "https://example.com/v1/oauth/token")!,
+            credentialsStore: store,
+            urlOpener: { _ in true }
+        )
+
+        service.startOAuthFlow()
+        // First submission mismatches on purpose, which resets codeVerifier/oauthState to nil.
+        await service.submitOAuthCode("first-code#wrong-state")
+        XCTAssertEqual(service.lastError, "OAuth state mismatch — try again")
+
+        // A second submission — the double-submit case — must not crash and must land on the
+        // "No pending OAuth flow" branch now that the flow has already been torn down.
+        await service.submitOAuthCode("second-code#wrong-state")
+
+        XCTAssertEqual(service.lastError, "No pending OAuth flow")
+        XCTAssertFalse(service.isAwaitingCode)
+    }
+
     func testSubmitOAuthCodeWithCorrectStateSucceeds() async throws {
         let store = try makeStore()
         let tokenURL = URL(string: "https://example.com/v1/oauth/token")!
@@ -746,7 +808,7 @@ final class UsageServiceTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return StoredCredentialsStore(accountId: accountId, directoryURL: directory)
+        return StoredCredentialsStore(accountId: accountId, directoryURL: directory, keychainService: keychainService)
     }
 
     private func makeSession() -> URLSession {

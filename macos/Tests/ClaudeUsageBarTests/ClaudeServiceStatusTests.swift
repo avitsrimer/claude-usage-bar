@@ -92,4 +92,47 @@ final class ClaudeServiceStatusTests: XCTestCase {
         XCTAssertEqual(snap.allMonitoredComponents.count, 2)
         XCTAssertEqual(snap.impactedComponents.map(\.id), ["b"])
     }
+
+    func testSnapshotMakeScopesActiveIncidentsToMonitoredComponents() {
+        let summary = StatusPageSummary(
+            components: [
+                StatusComponent(id: "a", name: "Claude API", status: .degradedPerformance),
+                StatusComponent(id: "c", name: "Console", status: .majorOutage)
+            ],
+            incidents: [
+                // Touches only the unmonitored "Console" component — must be filtered out even
+                // though it sorts first, so the popover never shows its name for a rollup that
+                // is actually caused by the monitored "Claude API" degradation.
+                StatusIncident(
+                    id: "unrelated",
+                    name: "Console outage",
+                    status: "investigating",
+                    impact: "critical",
+                    componentIds: ["c"]
+                ),
+                StatusIncident(
+                    id: "relevant",
+                    name: "API degraded",
+                    status: "investigating",
+                    impact: "minor",
+                    componentIds: ["a"]
+                )
+            ]
+        )
+        let snap = StatusSnapshot.make(from: summary, filter: .default, now: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(snap.activeIncidents.map(\.id), ["relevant"])
+    }
+
+    func testSnapshotMakeKeepsIncidentWithNoComponentListAsUnscoped() {
+        let summary = StatusPageSummary(
+            components: [
+                StatusComponent(id: "a", name: "Claude API", status: .operational)
+            ],
+            incidents: [
+                StatusIncident(id: "x", name: "Legacy incident", status: "investigating", impact: "minor")
+            ]
+        )
+        let snap = StatusSnapshot.make(from: summary, filter: .default, now: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(snap.activeIncidents.map(\.id), ["x"])
+    }
 }

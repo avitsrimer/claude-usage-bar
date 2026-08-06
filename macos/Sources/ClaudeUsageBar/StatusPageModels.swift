@@ -27,6 +27,11 @@ struct StatuspageIncidentDTO: Decodable {
     let impact: String
     let shortlink: URL?
     let updatedAt: Date?
+    /// Components this incident affects, per the Statuspage.io v2 incident schema. Absent on
+    /// some fixtures/older payloads, so this is optional and treated as empty when missing —
+    /// synthesized `Decodable` calls `decodeIfPresent` for `Optional` properties, so a missing
+    /// key decodes to `nil` rather than throwing.
+    let components: [StatuspageComponentDTO]?
 }
 
 extension StatuspageSummaryDTO {
@@ -49,7 +54,8 @@ extension StatuspageSummaryDTO {
                 status: dto.status,
                 impact: dto.impact,
                 shortlink: dto.shortlink,
-                updatedAt: dto.updatedAt
+                updatedAt: dto.updatedAt,
+                componentIds: dto.components?.map(\.id) ?? []
             )
         }
         return StatusPageSummary(components: components, incidents: incidents)

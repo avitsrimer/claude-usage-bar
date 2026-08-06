@@ -43,13 +43,15 @@ Multi-account service pattern with SwiftUI reactive state:
 
 **AccountManager** (`AccountManager.swift`) — top-level service locator owned by `@main`. Holds an array of accounts, instantiates one `UsageService` per account, and exposes the active account's service to views.
 
-**UsageService** (`UsageService.swift`) — per-account workhorse. Handles OAuth PKCE flow (browser-based, user pastes code), token storage in Keychain, polling the `GET /api/oauth/usage` endpoint, and token refresh on 401/429. Publishes `@Published` properties consumed by views.
+**UsageService** (`UsageService.swift`) — per-account workhorse. Handles OAuth PKCE flow (browser-based, user pastes code, opened via an injected `urlOpener` closure so tests can fake it), token storage in Keychain, polling the `GET /api/oauth/usage` endpoint, and token refresh on 401/429. A `@Published private(set) var isFetching` guard makes `fetchUsage()` re-entrancy-safe: a fetch already in flight causes any concurrent fire-and-forget kickoff (from `updatePollingInterval`/`startPolling`) to silently no-op rather than firing a duplicate request. Publishes `@Published` properties consumed by views.
 
 **UsageHistoryService** (`UsageHistoryService.swift`) — buffers incoming data points in memory and flushes to `history-{accountId}.json` on every `recordDataPoint()` call (immediate, not timer-based — durable across reboot/force-quit). Writes `0600` via a temp file + `replaceItemAt(_:withItemAt:options: [.usingNewMetadataOnly])`. Handles 30-day retention, downsampling for chart rendering, and corrupt-file recovery (moves a bad file to `.bak.json` and resets history).
 
 **NotificationService** (`NotificationService.swift`) — threshold-based macOS notifications. Defers `UNUserNotificationCenter` setup until the user explicitly requests permission (avoids startup prompt).
 
 **MenuBarIconRenderer** (`MenuBarIconRenderer.swift`) — draws the dual-bar mini icon representing 5h and 7d utilization percentages.
+
+**RightClickableMenuBarLabel** (`RightClickableMenuBarLabel.swift`) — overlays a transparent, click-through `NSView` on the menu bar label so a right-click pops a "Quit" `NSMenu` without disturbing `MenuBarExtra`'s own left-click-opens-popover handling. Uses AppKit's `hitTest`-returns-`nil` passthrough technique (rather than overriding `mouseDown`) so left-clicks fall through untouched — the one hitTest-passthrough usage in the codebase.
 
 **Service-status monitoring** (`StatusMonitor.swift`, `StatusPageClient.swift`, `ClaudeServiceStatus.swift`, `StatusPageModels.swift`, `ServiceStatusDisplayState.swift`) — polls Anthropic's status page and surfaces outage/maintenance state in the popover. `StatusMonitor` is a single app-wide `ObservableObject` instance owned by `ClaudeUsageBarApp`, not per-account (status is account-independent, unlike everything else here), and is off by default behind a `showServiceStatus` `@AppStorage` toggle in `SettingsView`. `StatusPageClient`/`StatusPageModels` fetch and decode the statuspage.io summary JSON; `ClaudeServiceStatus` models the resulting status; `ServiceStatusDisplayState.make(snapshot:lastError:)` maps that into what `PopoverView` renders.
 
@@ -71,4 +73,4 @@ Do not manually create releases — the workflow handles everything including ap
 
 ## Testing
 
-The mock server (`scripts/mock-server.py`) provides 10 scenarios covering edge cases like token expiry, 429 rate limit responses, and different usage levels. Use it when testing OAuth flows or error handling without hitting the real API.
+The mock server (`scripts/mock-server.py`) provides 10 scenarios covering edge cases like token expiry, 429 rate limit responses, and different usage levels. Use it when testing OAuth flows or error handling without hitting the real API. It has no statuspage endpoint, so the service-status indicator (`StatusMonitor`) can't be exercised through this mock server — verify it against the live `status.claude.com` or via the `StatusPageClientTests` fixtures instead.
