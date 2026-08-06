@@ -257,7 +257,7 @@ final class UsageServiceTests: XCTestCase {
             usageEndpoint: URL(string: "https://example.com/api/oauth/usage")!,
             userinfoEndpoint: userinfoURL,
             tokenEndpoint: tokenURL,
-            credentialsStore: store,
+            credentialsStore: store
         )
 
         await service.fetchProfile()
