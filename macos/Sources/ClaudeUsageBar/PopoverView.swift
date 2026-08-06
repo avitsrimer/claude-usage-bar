@@ -15,6 +15,12 @@ struct PopoverView: View {
     // (started/stopped below, only while this popover is visible) and the indicator itself.
     @AppStorage("showServiceStatus") private var showServiceStatus = false
 
+    // Fed to WindowPositionPreserver so it can resize the host window when content height
+    // changes (tab switch, refresh spinner, projection chart). Measured via the
+    // PopoverContentSizePreferenceKey background below, not via a second NSViewRepresentable —
+    // see Solution Overview decision #2.
+    @State private var measuredContentSize: CGSize = .zero
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if accountManager.multiAccountEnabled && accountManager.accounts.count > 1 {
@@ -45,7 +51,21 @@ struct PopoverView: View {
             }
         }
         .frame(width: 340)
-        .background(WindowPositionPreserver(trigger: accountManager.activeAccountId))
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: PopoverContentSizePreferenceKey.self, value: geo.size)
+            }
+        )
+        .onPreferenceChange(PopoverContentSizePreferenceKey.self) { newSize in
+            measuredContentSize = newSize
+        }
+        .background(
+            WindowPositionPreserver(
+                trigger: accountManager.activeAccountId,
+                size: measuredContentSize
+            )
+        )
         .onAppear {
             // Idle-CPU: the poller only ever runs while this popover is on screen, matching
             // AccountContentView's minute timer just above (started/stopped on appear/
@@ -502,16 +522,39 @@ private struct ServiceStatusIndicator: View {
     }
 }
 
+// MARK: - Popover content size measurement
+
+/// Reports the natural height of the popover's content up through `.frame(width: 340)`, so
+/// `WindowPositionPreserver` can resize the host window to match. Width is reported too (it's
+/// always 340) purely so `shouldApply` can compare a single `CGSize`; only height is ever
+/// applied to the window.
+private struct PopoverContentSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
 // MARK: - Window Position Preserver
 
-/// Preserves the NSWindow origin when content changes size (e.g. account switching),
-/// preventing MenuBarExtra from repositioning the window off-screen on full-screen spaces.
-private struct WindowPositionPreserver: NSViewRepresentable {
+/// Preserves the NSWindow's top edge and resizes it when content height changes (account
+/// switch, tab switch, refresh spinner, projection chart). MenuBarExtra's `.window` style does
+/// not track subsequent SwiftUI content-height changes on its own — there is no
+/// `.windowResizability` hook for it like there is for `Settings` — so this is the single place
+/// that both measures/reacts to height and preserves window position (Solution Overview
+/// decision #2: one NSWindow hook, not two).
+internal struct WindowPositionPreserver: NSViewRepresentable {
     let trigger: String?
+    let size: CGSize
+
+    /// Sub-pixel-scale size deltas (e.g. the refresh spinner's 2-second cooldown re-laying out
+    /// text) are treated as no-ops so they don't cause spurious resizes.
+    static let resizeEpsilon: CGFloat = 0.5
 
     class Coordinator {
         var savedOrigin: NSPoint?
         var lastTrigger: String? = "initial"
+        var lastSize: CGSize = .zero
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -519,15 +562,50 @@ private struct WindowPositionPreserver: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let window = nsView.window else { return }
-        guard context.coordinator.lastTrigger != trigger else { return }
+        let coordinator = context.coordinator
 
-        context.coordinator.savedOrigin = window.frame.origin
-        context.coordinator.lastTrigger = trigger
+        guard Self.shouldApply(
+            trigger: trigger,
+            size: size,
+            lastTrigger: coordinator.lastTrigger,
+            lastSize: coordinator.lastSize
+        ) else { return }
 
+        let originBeforeChange = window.frame.origin
+        let topYBeforeChange = originBeforeChange.y + window.frame.height
+        coordinator.savedOrigin = originBeforeChange
+        coordinator.lastTrigger = trigger
+        coordinator.lastSize = size
+
+        // Deferred to the next run-loop turn: setContentSize below triggers AppKit layout,
+        // which re-emits PopoverContentSizePreferenceKey, which could re-trigger updateNSView
+        // synchronously — the same class of feedback problem the origin-preservation logic
+        // already had to dodge. lastTrigger/lastSize above are updated *before* this hop so a
+        // re-entrant call in the meantime already reads as "no change" and skips.
         DispatchQueue.main.async {
-            if let origin = context.coordinator.savedOrigin {
-                window.setFrameOrigin(origin)
-            }
+            // setContentSize preserves the window's bottom-left origin, which would grow the
+            // popover upward past the menu bar icon. Re-anchor the top edge afterwards so the
+            // popover always grows/shrinks downward from a fixed top, whether this update was
+            // triggered by an account switch, a tab switch, or a height-only content change.
+            window.setContentSize(NSSize(width: window.frame.width, height: size.height))
+            window.setFrameOrigin(
+                NSPoint(x: originBeforeChange.x, y: topYBeforeChange - window.frame.height)
+            )
         }
+    }
+
+    /// Pure apply/skip decision, extracted so it's testable without constructing an NSWindow.
+    /// `size == .zero` means content hasn't been measured yet (GeometryReader hasn't laid out),
+    /// so there's no target height to apply regardless of the trigger.
+    internal static func shouldApply(
+        trigger: String?,
+        size: CGSize,
+        lastTrigger: String?,
+        lastSize: CGSize
+    ) -> Bool {
+        guard size != .zero else { return false }
+        if trigger != lastTrigger { return true }
+        return abs(size.height - lastSize.height) > resizeEpsilon
+            || abs(size.width - lastSize.width) > resizeEpsilon
     }
 }
