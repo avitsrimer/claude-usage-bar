@@ -6,13 +6,13 @@ import Charts
 struct ProjectionChartView: View {
     @ObservedObject var service: UsageService
     @ObservedObject var historyService: UsageHistoryService
+    // Threaded down from the parent's own minute-tick `@State`, matching
+    // `AccountContentView`/`UsageBucketRow`'s existing convention rather than adding a second
+    // "tick every 60s" mechanism (`TimelineView`) alongside that view's `Timer`-based one.
+    let now: Date
 
     var body: some View {
-        // Re-evaluate every minute so "now", the countdown, and the red line stay live while
-        // the popover is open, independent of the (possibly slow) poll cadence.
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            content(now: context.date)
-        }
+        content(now: now)
     }
 
     @ViewBuilder

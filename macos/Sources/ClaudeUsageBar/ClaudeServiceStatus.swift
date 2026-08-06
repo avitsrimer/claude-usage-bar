@@ -8,7 +8,7 @@ import os
 ///
 /// `underMaintenance` is treated as `operational` for severity purposes — surfacing scheduled
 /// maintenance distinctly is left for a future release.
-enum ClaudeServiceStatus: String, Sendable, Equatable, Codable, CaseIterable {
+enum ClaudeServiceStatus: String, Sendable, Equatable, CaseIterable {
     case operational
     case underMaintenance      = "under_maintenance"
     case degradedPerformance   = "degraded_performance"
@@ -42,6 +42,12 @@ enum ClaudeServiceStatus: String, Sendable, Equatable, Codable, CaseIterable {
         self = .operational
     }
 
+    // `os.Logger`, not the `print("[Notification] ...")` convention `NotificationService` uses
+    // elsewhere in this app. Deliberate, not an unreconciled second convention: this fires from
+    // a background poll loop on a warning that's diagnostic-only (schema drift, never
+    // user-facing), which is exactly what `Logger` is for — subsystem/category filtering in
+    // Console.app, no stdout noise in a release build. `NotificationService`'s prints stay as
+    // they are; this isn't a mandate to migrate them.
     static let logger = Logger(subsystem: "com.local.ClaudeUsageBar", category: "StatusPage")
 }
 
@@ -58,7 +64,7 @@ extension Sequence where Element == ClaudeServiceStatus {
 }
 
 /// One filtered/monitored component as seen by `StatusMonitor` callers.
-struct StatusComponent: Sendable, Equatable, Identifiable, Codable {
+struct StatusComponent: Sendable, Equatable, Identifiable {
     let id: String
     let name: String
     let status: ClaudeServiceStatus
@@ -75,7 +81,7 @@ struct StatusComponent: Sendable, Equatable, Identifiable, Codable {
 }
 
 /// One unresolved incident (from `summary.json`'s `incidents` array).
-struct StatusIncident: Sendable, Equatable, Identifiable, Codable {
+struct StatusIncident: Sendable, Equatable, Identifiable {
     let id: String
     let name: String
     let status: String        // "investigating" | "identified" | "monitoring" | "resolved"
@@ -109,7 +115,7 @@ struct StatusIncident: Sendable, Equatable, Identifiable, Codable {
 
 /// Decoded shape returned by `StatusPageClient.fetchSummary()`.
 /// Mirrors the Statuspage.io v2 `summary.json` payload but only the fields we use.
-struct StatusPageSummary: Sendable, Equatable, Codable {
+struct StatusPageSummary: Sendable, Equatable {
     let components: [StatusComponent]
     let incidents: [StatusIncident]
 
@@ -193,8 +199,14 @@ struct StatusComponentFilter: Sendable, Equatable, Codable {
     }
 }
 
-/// Errors surfaced by `StatusPageClient`. None of these are ever shown verbatim to users —
-/// the popover renders a generic "Status unavailable" instead.
+/// Errors surfaced by `StatusPageClient`. None of these are ever shown verbatim to users — the
+/// `.unavailable` case of `ServiceStatusDisplayState` simply hides the indicator instead.
+///
+/// Deliberately typed, unlike `UsageService.lastError: String?` (a user-facing message string).
+/// `StatusMonitor` never renders its error to the user, only whether one occurred (see
+/// `ServiceStatusDisplayState.make`), so there is no display string to own here — a typed error
+/// internally with a string surfaced only at UI boundaries that actually show one is a
+/// defensible split, not an oversight.
 enum StatusError: Error, Sendable, Equatable {
     case transport(URLError.Code)
     case http(Int)

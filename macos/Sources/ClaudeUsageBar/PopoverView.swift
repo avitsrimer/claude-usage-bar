@@ -267,7 +267,7 @@ private struct AccountContentView: View {
 
         if service.usage?.fiveHour != nil {
             Divider()
-            ProjectionChartView(service: service, historyService: historyService)
+            ProjectionChartView(service: service, historyService: historyService, now: now)
         }
 
         if let error = service.lastError {
@@ -543,7 +543,7 @@ private struct PopoverContentSizePreferenceKey: PreferenceKey {
 /// `.windowResizability` hook for it like there is for `Settings` — so this is the single place
 /// that both measures/reacts to height and preserves window position (Solution Overview
 /// decision #2: one NSWindow hook, not two).
-internal struct WindowPositionPreserver: NSViewRepresentable {
+struct WindowPositionPreserver: NSViewRepresentable {
     let trigger: String?
     let size: CGSize
 
@@ -597,7 +597,7 @@ internal struct WindowPositionPreserver: NSViewRepresentable {
     /// Pure apply/skip decision, extracted so it's testable without constructing an NSWindow.
     /// `size == .zero` means content hasn't been measured yet (GeometryReader hasn't laid out),
     /// so there's no target height to apply regardless of the trigger.
-    internal static func shouldApply(
+    static func shouldApply(
         trigger: String?,
         size: CGSize,
         lastTrigger: String?,

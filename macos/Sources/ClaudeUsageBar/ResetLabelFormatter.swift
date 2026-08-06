@@ -28,7 +28,7 @@ let resetLabelCalendar: Calendar = {
 /// re-suppress minutes once a day is involved: "3d 50m" is strictly more informative than
 /// "3d" and the formatter already computed it correctly, so throwing that precision away
 /// would be a step backwards. See `ResetLabelFormatterTests` for the test asserting this.
-internal func formatResetCountdown(from date: Date, now: Date, calendar: Calendar = resetLabelCalendar) -> String {
+func formatResetCountdown(from date: Date, now: Date, calendar: Calendar = resetLabelCalendar) -> String {
     guard date > now else { return "Resetting…" }
 
     let formatter = DateComponentsFormatter()
