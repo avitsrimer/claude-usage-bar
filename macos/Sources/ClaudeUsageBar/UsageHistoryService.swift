@@ -6,12 +6,9 @@ import AppKit
 class UsageHistoryService: ObservableObject {
     @Published var history = UsageHistory()
 
-    private var flushTimer: AnyCancellable?
-    private var isDirty = false
     private var terminationObserver: Any?
 
     private static let retentionInterval: TimeInterval = 30 * 86400 // 30 days
-    private static let flushInterval: TimeInterval = 300 // 5 minutes
 
     private let historyFileURL: URL
 
@@ -63,31 +60,35 @@ class UsageHistoryService: ObservableObject {
     func recordDataPoint(pct5h: Double, pct7d: Double) {
         let point = UsageDataPoint(pct5h: pct5h, pct7d: pct7d)
         history.dataPoints.append(point)
-        isDirty = true
-        startFlushTimerIfNeeded()
+        flushToDisk()
     }
 
     // MARK: - Flush
 
     func flushToDisk() {
-        guard isDirty else { return }
         history.dataPoints = pruned(history.dataPoints)
 
         guard let data = try? JSONEncoder.historyEncoder.encode(history) else { return }
-        try? data.write(to: historyFileURL, options: .atomic)
 
-        isDirty = false
-        flushTimer?.cancel()
-        flushTimer = nil
-    }
+        let directoryURL = historyFileURL.deletingLastPathComponent()
+        let tempURL = directoryURL.appendingPathComponent(".\(UUID().uuidString).tmp")
 
-    private func startFlushTimerIfNeeded() {
-        guard flushTimer == nil else { return }
-        flushTimer = Timer.publish(every: Self.flushInterval, on: .main, in: .common)
-            .autoconnect()
-            .sink { @MainActor [weak self] _ in
-                self?.flushToDisk()
-            }
+        let created = FileManager.default.createFile(
+            atPath: tempURL.path,
+            contents: data,
+            attributes: [.posixPermissions: 0o600]
+        )
+        guard created else { return }
+
+        do {
+            _ = try FileManager.default.replaceItemAt(
+                historyFileURL,
+                withItemAt: tempURL,
+                options: [.usingNewMetadataOnly]
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
     }
 
     // MARK: - Downsampling
