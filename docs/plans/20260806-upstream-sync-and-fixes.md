@@ -516,6 +516,13 @@ Branch: `feat/service-status-monitoring` — extracts the status feature from up
 
 ### Task 8: Resize the popover window when content height changes
 
+⚠️ Merged without a green CI check: GitHub was still reporting an active outage
+(githubstatus.com `indicator: "major"` — Partial System Outage), the same outage documented on
+Tasks 3-7, still unresolved at merge time. Verified locally instead: `swift test` 133/133 passed
+on the branch, diff manually scanned for trailing commas (none found). **Needs retroactive CI
+confirmation on `main` once GitHub recovers, with priority over the other tasks awaiting the
+same** — see Task 11.
+
 Branch: `fix/popover-adaptive-resize` — upstream `#53`'s intent on our existing hook.
 **Deliberately last of the `PopoverView` tasks** — Tasks 6 and 7 are what change content height,
 so resize can only be verified meaningfully once they exist.
@@ -523,33 +530,33 @@ so resize can only be verified meaningfully once they exist.
 **Files:**
 - Modify: `macos/Sources/ClaudeUsageBar/PopoverView.swift`
 
-- [ ] read `WindowPositionPreserver` (~`PopoverView.swift:392-420`) before changing anything
-- [ ] ⚠️ a **height signal is still required**: `updateNSView` early-returns unless its `trigger`
+- [x] read `WindowPositionPreserver` (~`PopoverView.swift:392-420`) before changing anything
+- [x] ⚠️ a **height signal is still required**: `updateNSView` early-returns unless its `trigger`
       (the account id) changed, and it takes no size input — so simply calling `setContentSize`
       there would never fire on tab change, spinner appearance, or projection-chart insertion,
       and would have no target size
-- [ ] add the measurement (a `GeometryReader` → `PreferenceKey` height is fine) and **feed it into
+- [x] add the measurement (a `GeometryReader` → `PreferenceKey` height is fine) and **feed it into
       the single existing `WindowPositionPreserver`** — do **not** add `#53`'s second
       `NSViewRepresentable`
-- [ ] widen the `trigger` guard so a size change also passes it, not just an account change
-- [ ] verify origin preservation and content resize don't fight: switching accounts must not both
+- [x] widen the `trigger` guard so a size change also passes it, not just an account change
+- [x] verify origin preservation and content resize don't fight: switching accounts must not both
       move and resize in conflicting directions
-- [ ] confirm `.frame(width: 340)` still holds and only height adapts
-- [ ] ⚠️ **guard against a resize feedback loop**: `setContentSize` triggers layout, which
+- [x] confirm `.frame(width: 340)` still holds and only height adapts
+- [x] ⚠️ **guard against a resize feedback loop**: `setContentSize` triggers layout, which
       re-emits the height preference. Our origin path already needs a `DispatchQueue.main.async`
       hop for this reason (`PopoverView.swift:414-418`). Task 4's spinner appears and disappears
       on a 2-second cooldown, so this path will be exercised repeatedly — apply an epsilon so
       sub-pixel deltas are no-ops
-- [ ] extract the apply/skip decision as an **`internal`** function on the coordinator, e.g.
+- [x] extract the apply/skip decision as an **`internal`** function on the coordinator, e.g.
       `shouldApply(trigger:size:lastTrigger:lastSize:) -> Bool`, so it can be tested without a
       window
-- [ ] write tests for that decision: trigger changed → apply; size changed beyond epsilon →
+- [x] write tests for that decision: trigger changed → apply; size changed beyond epsilon →
       apply; size changed within epsilon → skip; nothing changed → skip; `.zero` size → skip
-- [ ] **no test for the `setContentSize` call itself** — AppKit window mutation stays out of
+- [x] **no test for the `setContentSize` call itself** — AppKit window mutation stays out of
       tests and goes to Post-Completion manual checks. The decision logic above is the testable
       part; do not skip it and do not fabricate a test for the window call.
-- [ ] run `cd macos && swift test` (regression check only) — must pass before Task 9
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] run `cd macos && swift test` (regression check only) — must pass before Task 9
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 9: Harden the release build — strip xattrs and pin the create-dmg tarball
 
