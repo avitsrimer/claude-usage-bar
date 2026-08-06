@@ -414,6 +414,12 @@ Branch: `fix/reset-label-granularity` — **our own regression**, introduced by 
 
 ### Task 6: Add 5-hour usage projection graph and run-out estimate
 
+⚠️ Merged without a green CI check: GitHub was still reporting an active outage
+(githubstatus.com `indicator: "major"` — Partial System Outage) at merge time, the same
+outage documented on Tasks 3-5. Verified locally instead: `swift test` 93/93 passed on the
+branch, diff manually scanned for trailing commas (none found). **Needs retroactive CI
+confirmation on `main` once GitHub recovers** — see Task 11.
+
 Branch: `feat/usage-projection-graph` — ports upstream `#59` (chosen over `#52`'s forecasting)
 
 **Files:**
@@ -422,16 +428,16 @@ Branch: `feat/usage-projection-graph` — ports upstream `#59` (chosen over `#52
 - Create: `macos/Tests/ClaudeUsageBarTests/UsageProjectionTests.swift`
 - Modify: `macos/Sources/ClaudeUsageBar/PopoverView.swift`
 
-- [ ] port `UsageProjection` (projection maths + run-out estimate) from upstream `#59`
-- [ ] port `ProjectionChartView`, matching our existing `UsageChartView` conventions
-- [ ] wire into `AccountContentView`, which already receives the active `service`/`historyService`
+- [x] port `UsageProjection` (projection maths + run-out estimate) from upstream `#59`
+- [x] port `ProjectionChartView`, matching our existing `UsageChartView` conventions
+- [x] wire into `AccountContentView`, which already receives the active `service`/`historyService`
       — this is a small insert, not a multi-account refactor
-- [ ] handle sparse/empty history (a fresh account has no data points) without dividing by zero
+- [x] handle sparse/empty history (a fresh account has no data points) without dividing by zero
       or rendering a degenerate chart
-- [ ] port and adapt upstream's projection tests
-- [ ] write a test for the empty/sparse-history edge case
-- [ ] run `cd macos && swift test` — must pass before Task 7
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] port and adapt upstream's projection tests
+- [x] write a test for the empty/sparse-history edge case
+- [x] run `cd macos && swift test` — must pass before Task 7
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 7: Add Claude service-status monitoring
 
