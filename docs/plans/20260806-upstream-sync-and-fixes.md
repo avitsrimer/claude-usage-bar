@@ -264,16 +264,16 @@ Branch: `fix/chart-plotframe-nil-guard` — ports upstream `#54`
 **Files:**
 - Modify: `macos/Sources/ClaudeUsageBar/UsageChartView.swift`
 
-- [ ] replace `geo[proxy.plotFrame!].origin` (~`UsageChartView.swift:113`, inside
+- [x] replace `geo[proxy.plotFrame!].origin` (~`UsageChartView.swift:113`, inside
       `.chartOverlay { proxy in GeometryReader { geo in … .onContinuousHover { … } } }`) with
       `guard let plotFrame = proxy.plotFrame else { return }` then `geo[plotFrame].origin`
-- [ ] scan the rest of `UsageChartView.swift` for other `plotFrame` force-unwraps; fix the same way
-- [ ] **no unit test** — `ChartProxy`/`GeometryProxy` cannot be constructed in a test and
+- [x] scan the rest of `UsageChartView.swift` for other `plotFrame` force-unwraps; fix the same way
+- [x] **no unit test** — `ChartProxy`/`GeometryProxy` cannot be constructed in a test and
       `hoverDate` is `@State`. Upstream `#54` shipped zero tests for the same reason. Compile +
       the manual hover check in Post-Completion is the verification. Do not fabricate a
       tautological test.
-- [ ] run `cd macos && swift test` (regression check only) — must pass before Task 2
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] run `cd macos && swift test` (regression check only) — must pass before Task 2
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 2: Fix whitespace crash and make OAuth state validation mandatory
 
