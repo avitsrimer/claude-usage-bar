@@ -560,6 +560,18 @@ so resize can only be verified meaningfully once they exist.
 
 ### Task 9: Harden the release build — strip xattrs and pin the create-dmg tarball
 
+⚠️ Merged without a green CI check: GitHub was reporting an active outage (githubstatus.com
+`indicator: "major"` — Partial System Outage), the same outage documented on Tasks 3-8, still
+unresolved at merge time. No checks even registered on PR #10 (`gh pr checks` reported none),
+consistent with the same pre-build infra failure. Verified locally instead: `make app` succeeded
+(binary built, bundle assembled, xattrs stripped, ad-hoc codesign applied including nested Sparkle
+framework/XPC services), `codesign -v` verified OK, `swift test` 133/133 passed, and the new
+checksum-gate logic was exercised directly (isolated from an unrelated Finder-alias AppleEvent
+timeout hit locally in `create_dmg`) confirming it fails loudly on a wrong hash and matches on the
+correct one. The create-dmg v1.2.3 tarball's SHA256 was independently recomputed and matches both
+the pinned constant and the upstream `#43` citation. **Needs retroactive CI confirmation on `main`
+once GitHub recovers, with priority over the other tasks awaiting the same** — see Task 11.
+
 Branch: `fix/build-hardening` — upstream `#20` + `#43`'s `build.sh` half
 
 **Files:**
@@ -582,7 +594,7 @@ Branch: `fix/build-hardening` — upstream `#20` + `#43`'s `build.sh` half
       PR, so the codesign and DMG paths are regression-covered. Record `make app` +
       `codesign -v` output in the PR description
 - [x] run `cd macos && swift test` — must pass before Task 10
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 10: Add right-click-to-quit on the menu bar icon
 
