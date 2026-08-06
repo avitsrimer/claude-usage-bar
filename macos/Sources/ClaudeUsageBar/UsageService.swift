@@ -23,6 +23,7 @@ class UsageService: ObservableObject {
     private let credentialsStore: StoredCredentialsStore
     private var currentInterval: TimeInterval
     private var refreshTask: Task<Bool, Never>?
+    private let urlOpener: @MainActor (URL) -> Bool
 
     static let defaultPollingMinutes = 30
     static let pollingOptions = [5, 15, 30, 60]
@@ -76,7 +77,8 @@ class UsageService: ObservableObject {
         tokenEndpoint: URL = UsageService.defaultTokenEndpoint,
         redirectUri: String = UsageService.defaultRedirectURI,
         credentialsStore: StoredCredentialsStore,
-        initialEmail: String? = nil
+        initialEmail: String? = nil,
+        urlOpener: @MainActor @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }
     ) {
         self.session = session
         self.usageEndpoint = usageEndpoint
@@ -84,6 +86,7 @@ class UsageService: ObservableObject {
         self.tokenEndpoint = tokenEndpoint
         self.redirectUri = redirectUri
         self.credentialsStore = credentialsStore
+        self.urlOpener = urlOpener
         let stored = UserDefaults.standard.integer(forKey: "pollingMinutes")
         let minutes = Self.pollingOptions.contains(stored) ? stored : Self.defaultPollingMinutes
         self.pollingMinutes = minutes
@@ -122,9 +125,6 @@ class UsageService: ObservableObject {
         let challenge = generateCodeChallenge(from: verifier)
         let state = generateCodeVerifier() // random state
 
-        codeVerifier = verifier
-        oauthState = state
-
         var components = URLComponents(url: Self.authorizeEndpoint, resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "code", value: "true"),
@@ -134,23 +134,38 @@ class UsageService: ObservableObject {
             URLQueryItem(name: "scope", value: Self.defaultOAuthScopes.joined(separator: " ")),
             URLQueryItem(name: "code_challenge", value: challenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
-            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "state", value: state)
         ]
 
-        if let url = components.url {
-            NSWorkspace.shared.open(url)
-            isAwaitingCode = true
+        guard let url = components.url, urlOpener(url) else {
+            lastError = "Could not open Claude sign-in page"
+            codeVerifier = nil
+            oauthState = nil
+            isAwaitingCode = false
+            return
         }
+
+        codeVerifier = verifier
+        oauthState = state
+        isAwaitingCode = true
     }
 
     func submitOAuthCode(_ rawCode: String) async {
         // Response format: "code#state" — parse it
         let parts = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "#", maxSplits: 1)
-        let code = String(parts[0])
 
-        if parts.count > 1 {
-            let returnedState = String(parts[1])
-            guard returnedState == oauthState else {
+        // A whitespace-only paste trims to "" and split returns []. Leave isAwaitingCode
+        // untouched so the user can retry without restarting the flow (upstream #50).
+        guard let firstPart = parts.first else {
+            lastError = "Please paste the code you received"
+            return
+        }
+        let code = String(firstPart)
+
+        // When a flow is pending, a state component is mandatory — both a missing state and
+        // a mismatched state are CSRF failures and reset the flow the same way (#43).
+        if oauthState != nil {
+            guard parts.count > 1, String(parts[1]) == oauthState else {
                 lastError = "OAuth state mismatch — try again"
                 isAwaitingCode = false
                 codeVerifier = nil
