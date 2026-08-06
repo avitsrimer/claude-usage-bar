@@ -22,6 +22,9 @@ This is a fork of [Blimp-Labs/claude-usage-bar](https://github.com/Blimp-Labs/cl
 
 **Features**
 - **Multi-account support** — add multiple Claude accounts, switch between them via tabs, set optional display aliases. The menu bar icon always reflects the active account. Can be toggled off in Settings when only one account is needed.
+- **5-hour usage projection** — projects your current usage trend forward and estimates when you'll run out within the 5-hour window, shown as a small chart alongside the usage history.
+- **Claude service-status indicator** — shows Anthropic's status page state (outage/maintenance) in the popover, so you can tell a slowdown from an actual incident. Off by default; enable in Settings.
+- **Right-click to quit** — right-click the menu bar icon for a Quit option, without disturbing the normal left-click popover.
 
 **Performance**
 - **Near-zero CPU when idle** — the original used `Text(date, style: .relative)` for reset timers and "last updated", which hooks into a display-link and continuously re-renders the view even with the popover closed (~4% constant CPU). Replaced with `RelativeDateTimeFormatter` strings updated by a 60s timer that only runs while the popover is open.
@@ -44,8 +47,11 @@ A tiny macOS menu bar app that shows your Claude API usage at a glance. Click it
 - Extra usage tracking with USD currency display
 - Usage history chart — see how your usage evolves over time (1h / 6h / 1d / 7d / 30d)
 - Hover over the chart to see exact values at any point
+- 5-hour usage projection with a run-out estimate, so you know before you hit the limit
 - **Multi-account support** — add multiple Claude accounts, switch between them via tabs, set optional aliases
 - Configurable polling interval (5m / 15m / 30m / 1h)
+- Optional Claude service-status indicator (off by default — enable in Settings)
+- Right-click the menu bar icon to quit
 - Built-in update checks via Sparkle
 - Just sign in — OAuth via browser, no API keys to manage
 - Minimal dependencies — SwiftUI, Swift Charts, Foundation, and Sparkle for updates

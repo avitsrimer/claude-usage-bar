@@ -672,12 +672,14 @@ a fresh run once Actions reports `operational`) once the outage clears.
       covered by the plan's existing Post-Completion manual-check list
 
 ### Task 12: [Final] Update documentation
-- [ ] update `README.md` if the new features (projection, service status, right-click quit) are
-      user-visible enough to document
-- [ ] update `CLAUDE.md` with the new architecture pieces (`StatusMonitor`, `UsageProjection`,
+- [x] update `README.md` if the new features (projection, service status, right-click quit) are
+      user-visible enough to document — decided yes for all three: added entries to the "Fork
+      improvements → Features" list and to the "What it does" bullet list, matching existing
+      style; noted the service-status indicator is off by default
+- [x] update `CLAUDE.md` with the new architecture pieces (`StatusMonitor`, `UsageProjection`,
       `ResetLabelFormatter`) and — importantly — the macos-14 CI / Swift-version constraint as a
       standing rule
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — no checkboxes, informational only*
