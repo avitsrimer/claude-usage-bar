@@ -9,6 +9,11 @@ private let relativeDateFormatter: RelativeDateTimeFormatter = {
 struct PopoverView: View {
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var appUpdater: AppUpdater
+    @ObservedObject var statusMonitor: StatusMonitor
+
+    // Off by default. See StatusMonitor/ServiceStatusIndicator — gates both the poller
+    // (started/stopped below, only while this popover is visible) and the indicator itself.
+    @AppStorage("showServiceStatus") private var showServiceStatus = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,9 +39,31 @@ struct PopoverView: View {
             } else {
                 noAccountView
             }
+
+            if showServiceStatus {
+                ServiceStatusIndicator(monitor: statusMonitor)
+            }
         }
         .frame(width: 340)
         .background(WindowPositionPreserver(trigger: accountManager.activeAccountId))
+        .onAppear {
+            // Idle-CPU: the poller only ever runs while this popover is on screen, matching
+            // AccountContentView's minute timer just above (started/stopped on appear/
+            // disappear). Regresses nothing from 96aee35 — status.claude.com is only ever
+            // hit while the user is actually looking at the popover, and only when the
+            // showServiceStatus toggle (default off) is on.
+            if showServiceStatus { statusMonitor.start() }
+        }
+        .onDisappear {
+            statusMonitor.stop()
+        }
+        .onChange(of: showServiceStatus) { _, enabled in
+            if enabled {
+                statusMonitor.start()
+            } else {
+                statusMonitor.stop()
+            }
+        }
     }
 
     private var noAccountView: some View {
@@ -422,6 +449,56 @@ private func colorForPct(_ pct: Double) -> Color {
     case ..<0.60: return .green
     case 0.60..<0.80: return .yellow
     default: return .red
+    }
+}
+
+// MARK: - Service Status Indicator
+
+/// Minimal service-status indicator: a colored dot + a one-line label, shown only while
+/// Claude has an active non-operational component. Deliberately not upstream #52's full
+/// popover "Service Status" section (per-component rows, incident list, status-page link) —
+/// this fork rejects that visual refresh. Account-independent, so it renders once at the
+/// bottom of the popover regardless of which account tab is active.
+private struct ServiceStatusIndicator: View {
+    @ObservedObject var monitor: StatusMonitor
+
+    var body: some View {
+        switch ServiceStatusDisplayState.make(snapshot: monitor.snapshot, lastError: monitor.lastError) {
+        case .ready(let snapshot) where snapshot.rollup != .operational:
+            Divider()
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(color(for: snapshot.rollup))
+                    .frame(width: 6, height: 6)
+                Text(snapshot.activeIncidents.first?.name ?? label(for: snapshot.rollup))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func color(for status: ClaudeServiceStatus) -> Color {
+        switch status {
+        case .operational, .underMaintenance: return .green
+        case .degradedPerformance, .partialOutage: return .orange
+        case .majorOutage: return .red
+        }
+    }
+
+    private func label(for status: ClaudeServiceStatus) -> String {
+        switch status {
+        case .operational: return "Operational"
+        case .underMaintenance: return "Under maintenance"
+        case .degradedPerformance: return "Degraded performance"
+        case .partialOutage: return "Partial outage"
+        case .majorOutage: return "Major outage"
+        }
     }
 }
 

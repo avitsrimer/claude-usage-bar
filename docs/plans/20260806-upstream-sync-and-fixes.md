@@ -441,6 +441,17 @@ Branch: `feat/usage-projection-graph` — ports upstream `#59` (chosen over `#52
 
 ### Task 7: Add Claude service-status monitoring
 
+⚠️ Merged without a green CI check: GitHub was reporting an active outage (githubstatus.com
+`indicator: "major"` — Partial System Outage), the same outage documented on Tasks 3-6, still
+unresolved at merge time. Verified locally instead: `swift test` 127/127 passed on the branch,
+diff manually scanned for trailing commas (none found). **This task is HIGHER risk than most for
+a local-pass/CI-fail surprise** — it adds a `resources:` block to `Package.swift`'s test target,
+a new `swift --version` CI step, and converts upstream's `@Observable`/`nonisolated(unsafe)`
+`StatusMonitor` to `ObservableObject`/`@Published` — exactly the class of change (Package
+manifest changes, new CI steps, actor-isolation conversions) that can pass locally and fail on
+the older CI toolchain. **Needs retroactive CI confirmation on `main` once GitHub recovers, with
+priority over the other tasks awaiting the same** — see Task 11.
+
 Branch: `feat/service-status-monitoring` — extracts the status feature from upstream `#49`
 
 **Files:**
@@ -461,10 +472,10 @@ Branch: `feat/service-status-monitoring` — extracts the status feature from up
 
 ⚠️ **This is the least mechanical task in the plan. Read all four warnings before writing code.**
 
-- [ ] **add `resources: [.process("Fixtures")]` to the `.testTarget` in `macos/Package.swift`** —
+- [x] **add `resources: [.process("Fixtures")]` to the `.testTarget` in `macos/Package.swift`** —
       it currently has none, and upstream's tests use `Bundle.module`, which will not compile
       without it. `#49` contains the exact edit; copy it
-- [ ] ⚠️ **the indicator does not compile as ported.** `#49` gates it with
+- [x] ⚠️ **the indicator does not compile as ported.** `#49` gates it with
       `@AppStorage(AppearanceDefaultsKey.showServiceStatus)` and paces polling with
       `AppearanceDefaultsKey.statusPollMinutes` / `StatusPollOptions` — all declared in
       `AppearanceSettings.swift`, which this task rejects. Do **not** resolve the resulting
@@ -473,13 +484,13 @@ Branch: `feat/service-status-monitoring` — extracts the status feature from up
       contradicts the idle-CPU requirement below. Instead add a single
       `@AppStorage("showServiceStatus")` bool defaulting to `false`, with a toggle in our
       `SettingsView`, and a plain interval constant in place of `StatusPollOptions`
-- [ ] ⚠️ **name the owner of `StatusMonitor` explicitly.** It is account-independent — one
+- [x] ⚠️ **name the owner of `StatusMonitor` explicitly.** It is account-independent — one
       instance for the whole app, not one per account. `#49` holds it as
       `@State private var statusMonitor` in a view. In our architecture put a single instance in
       `ClaudeUsageBarApp` and pass it down; do **not** instantiate it inside `PopoverView` (it
       would be recreated on view init, orphaning poll tasks) and do **not** put it in
       `AccountManager` per account (N pollers hitting the status page)
-- [ ] ⚠️ **convert `StatusMonitor` to our reactive convention.** `#49` declares it
+- [x] ⚠️ **convert `StatusMonitor` to our reactive convention.** `#49` declares it
       `@MainActor @Observable public final class` with `nonisolated(unsafe)` observer tokens.
       `@Observable` needs Swift 5.9 and `nonisolated(unsafe)` needs 5.10+, and our CI Swift
       version is only known to be older than 6.1 — this is the largest block of foreign modern
@@ -487,21 +498,21 @@ Branch: `feat/service-status-monitoring` — extracts the status feature from up
       `ObservableObject` + `@Published`, matching `AccountManager`, `UsageService`,
       `UsageHistoryService` and `NotificationService` (and what CLAUDE.md documents). Views then
       use `@ObservedObject`, not `@State`
-- [ ] ➕ add a `swift --version` step to `.github/workflows/build.yml` so the CI toolchain is
+- [x] ➕ add a `swift --version` step to `.github/workflows/build.yml` so the CI toolchain is
       recorded once instead of inferred — this has now cost us twice
-- [ ] port `StatusPageModels`, `ClaudeServiceStatus`, `StatusPageClient`, `StatusMonitor` and the
+- [x] port `StatusPageModels`, `ClaudeServiceStatus`, `StatusPageClient`, `StatusMonitor` and the
       5 JSON fixtures from `#49`
-- [ ] port `ServiceStatusDisplayState` (with `make(snapshot:lastError:)`) out of upstream's
+- [x] port `ServiceStatusDisplayState` (with `make(snapshot:lastError:)`) out of upstream's
       `PopoverView` into its own file, `internal` so tests can reach it
-- [ ] add a minimal status indicator to `PopoverView` — explicitly **not** `#52`'s popover visual
+- [x] add a minimal status indicator to `PopoverView` — explicitly **not** `#52`'s popover visual
       refresh, `AppearanceSettings`, `ResetIndicatorState`, `MenuBarIconRenderer` rework,
       entitlements, or `Info.plist` churn
-- [ ] ensure the status poller doesn't reintroduce idle CPU cost (respect `96aee35`) — no timer
+- [x] ensure the status poller doesn't reintroduce idle CPU cost (respect `96aee35`) — no timer
       spinning while the popover is closed unless justified in the PR
-- [ ] port upstream's client/monitor/status/display-state tests and adapt them
-- [ ] write tests for the outage/maintenance/unknown-status fixtures end to end
-- [ ] run `cd macos && swift test` — must pass before Task 8
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] port upstream's client/monitor/status/display-state tests and adapt them
+- [x] write tests for the outage/maintenance/unknown-status fixtures end to end
+- [x] run `cd macos && swift test` — must pass before Task 8
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 8: Resize the popover window when content height changes
 
