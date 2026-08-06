@@ -283,28 +283,28 @@ Branch: `fix/oauth-submit-hardening` — upstream `#50` + the non-Keychain half 
 - Modify: `macos/Sources/ClaudeUsageBar/UsageService.swift`
 - Modify: `macos/Tests/ClaudeUsageBarTests/UsageServiceTests.swift`
 
-- [ ] in `submitOAuthCode(_:)`, guard the empty-`parts` case before `String(parts[0])` so a
+- [x] in `submitOAuthCode(_:)`, guard the empty-`parts` case before `String(parts[0])` so a
       whitespace-only paste sets `lastError` instead of trapping (`#50`)
-- [ ] require a state component whenever `oauthState != nil`: missing state sets `lastError`
+- [x] require a state component whenever `oauthState != nil`: missing state sets `lastError`
       and resets `codeVerifier`, `oauthState`, `isAwaitingCode` (`#43`)
-- [ ] keep the existing mismatch branch intact (`"OAuth state mismatch — try again"`)
-- [ ] add `urlOpener: @MainActor @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }` to
+- [x] keep the existing mismatch branch intact (`"OAuth state mismatch — try again"`)
+- [x] add `urlOpener: @MainActor @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }` to
       `UsageService.init` — do **not** copy upstream's signature, which contains a
       `localProfileLoader` parameter we don't have and defaults `credentialsStore` (we require it)
-- [ ] on `urlOpener` returning false, set `lastError = "Could not open Claude sign-in page"`,
+- [x] on `urlOpener` returning false, set `lastError = "Could not open Claude sign-in page"`,
       reset flow state, and do **not** set `isAwaitingCode = true`
-- [ ] ⚠️ **the empty-code path must leave `isAwaitingCode == true`**, unlike the CSRF/mismatch
+- [x] ⚠️ **the empty-code path must leave `isAwaitingCode == true`**, unlike the CSRF/mismatch
       paths which reset it. Upstream `#50` is deliberate here ("Leave `isAwaitingCode` set so the
       user can retry without restarting") — harmonising all error branches would close the
       code-entry UI on a stray space, a UX regression
-- [ ] write tests: `"   "` (whitespace-only) does not crash, sets an error, and leaves
+- [x] write tests: `"   "` (whitespace-only) does not crash, sets an error, and leaves
       `isAwaitingCode == true`
-- [ ] write tests: bare code with a pending flow is rejected; correct `code#state` still
+- [x] write tests: bare code with a pending flow is rejected; correct `code#state` still
       succeeds; mismatched state still rejected
-- [ ] write tests: `urlOpener` false → error + `isAwaitingCode == false`; true → `isAwaitingCode == true`
-- [ ] do **NOT** touch `StoredCredentials.swift` — `#43`'s Keychain changes are rejected
-- [ ] run `cd macos && swift test` — must pass before Task 3
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] write tests: `urlOpener` false → error + `isAwaitingCode == false`; true → `isAwaitingCode == true`
+- [x] do **NOT** touch `StoredCredentials.swift` — `#43`'s Keychain changes are rejected
+- [x] run `cd macos && swift test` — must pass before Task 3
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 3: Flush history on every data point and write it 0600
 
