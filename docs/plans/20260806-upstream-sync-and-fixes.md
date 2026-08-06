@@ -605,19 +605,19 @@ Branch: `feat/right-click-quit` — ports upstream `#21` (pre-restructure paths,
 - Modify: `macos/Sources/ClaudeUsageBar/ClaudeUsageBarApp.swift`
 - Create: `macos/Tests/ClaudeUsageBarTests/RightClickableMenuBarLabelTests.swift`
 
-- [ ] port `RightClickableMenuBarLabel` (right-click → `NSMenu` with Quit)
-- [ ] wire into the `MenuBarExtra` label without disturbing left-click popover behaviour
-- [ ] ⚠️ **preserve template tinting**: `renderIcon`/`renderUnauthenticatedIcon` set
+- [x] port `RightClickableMenuBarLabel` (right-click → `NSMenu` with Quit)
+- [x] wire into the `MenuBarExtra` label without disturbing left-click popover behaviour
+- [x] ⚠️ **preserve template tinting**: `renderIcon`/`renderUnauthenticatedIcon` set
       `image.isTemplate = true` (`MenuBarIconRenderer.swift:57`, `:78`). Upstream's
       `MenuBarIconView.draw(_:)` draws the `NSImage` manually, bypassing status-bar template
       tinting — the dual-bar icon would stop adapting to light/dark menu bars. Honour
       `isTemplate` or tint with `NSColor.controlTextColor`
-- [ ] ⚠️ **preserve `.task { accountManager.startPolling() }`** on the label
+- [x] ⚠️ **preserve `.task { accountManager.startPolling() }`** on the label
       (`ClaudeUsageBarApp.swift:16-18`) — if the rewrite drops it, polling never starts and no
       test will catch it
-- [ ] write tests for the extractable menu-construction logic
-- [ ] run `cd macos && swift test` — must pass before Task 11
-- [ ] push branch, open PR, confirm CI green, merge
+- [x] write tests for the extractable menu-construction logic
+- [x] run `cd macos && swift test` — must pass before Task 11
+- [x] push branch, open PR, confirm CI green, merge
 
 ### Task 11: Verify acceptance criteria
 - [ ] verify all 10 implementation tasks are complete

@@ -13,10 +13,12 @@ struct ClaudeUsageBarApp: App {
         MenuBarExtra {
             PopoverView(accountManager: accountManager, appUpdater: appUpdater, statusMonitor: statusMonitor)
         } label: {
-            Image(nsImage: accountManager.isActiveAccountAuthenticated
-                ? renderIcon(pct5h: accountManager.activePct5h, pct7d: accountManager.activePct7d)
-                : renderUnauthenticatedIcon()
-            )
+            RightClickableMenuBarLabel {
+                Image(nsImage: accountManager.isActiveAccountAuthenticated
+                    ? renderIcon(pct5h: accountManager.activePct5h, pct7d: accountManager.activePct7d)
+                    : renderUnauthenticatedIcon()
+                )
+            }
             .task {
                 accountManager.startPolling()
             }
