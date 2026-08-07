@@ -638,6 +638,9 @@ none has actually executed, let alone passed. Per the plan's outage policy this 
 unchecked rather than fabricated as a pass; it must be revisited (re-run `gh run list`, or trigger
 a fresh run once Actions reports `operational`) once the outage clears.
 
+**Resolved 2026-08-07** — Actions recovered; see the "Retroactive CI confirmation" note under the
+checklist item below for the full story, including a real code bug this surfaced and fixed.
+
 - [x] verify all 10 implementation tasks are complete — read every Task 1-10 section; all
       checkboxes are `[x]`
 - [x] verify every rejected item was left alone — in particular `StoredCredentials.swift` must be
@@ -659,10 +662,35 @@ a fresh run once Actions reports `operational`) once the outage clears.
       after) and ran it explicitly (`swift test --filter UsageHistoryServiceTests`): 5/5 tests
       passed, including this one and `testFreshFileIsCreatedWithMode0600`
 - [x] run full test suite: `cd macos && swift test` — **142/142 tests passed, 0 failures**
-- [ ] confirm all 10 PRs merged and CI green on `main` — **not confirmed, see outage note above.**
+- [x] confirm all 10 PRs merged and CI green on `main` — **confirmed 2026-08-07.**
       All 10 PRs are merged into `main` (verified via `gh pr list --state merged`: PRs #2-#11,
-      one per task, plus PR #1 predating this plan). CI green cannot be confirmed while Actions
-      is in `major_outage`
+      one per task, plus PR #1 predating this plan).
+
+      **Retroactive CI confirmation (resolves the outage notes on Tasks 3-10 and the note
+      above):** GitHub Actions recovered (`githubstatus.com` `Actions` component back to
+      `operational`). Checked whether any of the outage-era stuck runs on `main` had resolved
+      on their own (`gh run list --branch main --limit 15`) — they had, and several came back
+      **red**, not just stuck: `Run tests` failed with 4 unexpected `StatusPageClientTests`
+      failures (`decode("dataCorrupted(... Expected date string to be ISO8601-formatted ...)")`),
+      e.g. run
+      [31125492525](https://github.com/avitsrimer/claude-usage-bar/actions/runs/31125492525).
+
+      This was a **real code bug**, not infra flakiness: `StatusPageClient.makeDecoder()` used
+      `JSONDecoder`'s built-in `.iso8601` strategy, which has no fractional-seconds support, while
+      the Statuspage.io fixtures/live API emit millisecond-precision timestamps (e.g.
+      `2026-05-06T08:41:02.090Z`). It shipped via Task 7/8's outage-bypass merge (PR #8,
+      `feat/service-status-monitoring`) because the local dev machine's newer Swift/Foundation
+      toolchain parses fractional seconds under `.iso8601` regardless, silently masking the bug
+      that macOS 14 CI runners reject — exactly the local-pass/CI-fail trap this plan's ⚠️ notes
+      warned about, just never actually checked against real CI until now. Fixed in
+      `953f557` by switching to a `.custom` decoding strategy that tries
+      `[.withInternetDateTime, .withFractionalSeconds]` then falls back to
+      `[.withInternetDateTime]`, mirroring the existing fallback pattern already used in
+      `UsageModel.parseResetDate`. Verified locally first (`swift build -c release`, `swift test`
+      152/152, `make release-artifacts` incl. `verify-release`), then pushed and watched a fresh
+      run to completion: **[31133878289](https://github.com/avitsrimer/claude-usage-bar/actions/runs/31133878289)
+      — `completed` / `success`**, at `main`'s current tip (`953f557`). This is the real,
+      unambiguous CI-green confirmation the outage notes on Tasks 3-10 were waiting on.
 - [x] verify `make app` builds and launches — `make app` succeeded (release binary built, bundle
       assembled, xattrs stripped, ad-hoc codesign incl. nested Sparkle framework/XPC services,
       `codesign -v` verified OK). Launched the built `.app` directly (`open ./ClaudeUsageBar.app`);
