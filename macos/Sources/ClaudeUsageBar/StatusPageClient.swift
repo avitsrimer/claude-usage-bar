@@ -72,8 +72,35 @@ actor StatusPageClient {
     static func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
-        d.dateDecodingStrategy = .iso8601
+        d.dateDecodingStrategy = .custom(Self.decodeISO8601Date)
         return d
+    }
+
+    /// `JSONDecoder`'s built-in `.iso8601` strategy uses a strict `ISO8601DateFormatter`
+    /// with no fractional-seconds support. Statuspage.io emits millisecond-precision
+    /// timestamps (e.g. `2026-05-06T08:41:02.090Z`), which that strategy rejects — this
+    /// mirrors the fractional-seconds-then-fallback pattern already used in
+    /// `UsageModel.parseResetDate` so both formats decode reliably.
+    private static let decodeISO8601Date: @Sendable (Decoder) throws -> Date = { decoder in
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+
+        let isoFormatters: [ISO8601DateFormatter.Options] = [
+            [.withInternetDateTime, .withFractionalSeconds],
+            [.withInternetDateTime]
+        ]
+        for options in isoFormatters {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = options
+            if let date = formatter.date(from: value) {
+                return date
+            }
+        }
+
+        throw DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Expected date string to be ISO8601-formatted."
+        )
     }
 
     static let defaultUserAgent: String = {
